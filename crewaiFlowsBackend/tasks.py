@@ -9,18 +9,21 @@ from utils.jobManager import append_event, get_job_by_id, update_job_by_id
 from utils.myLLM import my_llm
 
 
+# OPENAI_BASE_URL=https://yunwu.ai/v1
+# OPENAI_API_KEY=sk-ZMQCPKllNuc0sXwa10dZsdhvkBKn0zlesmShxlsNZsotsiav
+# OPENAI_CHAT_MODEL=gpt-4o-mini
 
 # 设置OpenAI的大模型的参数  Task中设置输出为:output_json时，需要用到默认的大模型
-os.environ["OPENAI_API_BASE"] = "https://api.wlai.vip/v1"
-os.environ["OPENAI_API_KEY"] = "sk-FQZgr4fvjIv8iKaTR8QgtvEEhdS6CfFcNI1EHUTiVqD0R4hr"
+os.environ["OPENAI_API_BASE"] = "https://yunwu.ai/v1"
+os.environ["OPENAI_API_KEY"] = "sk-ZMQCPKllNuc0sXwa10dZsdhvkBKn0zlesmShxlsNZsotsiav"
 os.environ["OPENAI_MODEL_NAME"] = "gpt-4o-mini"
 # 设置google搜索引擎
-os.environ["SERPER_API_KEY"] = "ddfea55d4d309045283e518773f11b872c318f0d"
+os.environ["SERPER_API_KEY"] = "dab5c8339d04bf0f267f702b1dd1a1df4d22e054"
 
 LLM_TYPE = "openai"
 
 # 创建 Celery 实例
-app = Celery('my_app', broker='redis://localhost:6379/0')
+app = Celery('my_app', broker='redis://127.0.0.1:6379/0')
 
 
 # 定义flow

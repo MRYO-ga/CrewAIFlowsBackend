@@ -70,12 +70,16 @@ app.add_middleware(
 async def run_flow(request: CrewRequest):
     try:
         job_id = str(uuid4())
+        print(f"Generated job_id: {job_id}")
         inputData = {
             "customer_domain": request.customer_domain,
             "project_description": request.project_description
         }
         # 使用 Celery 调用 kickoff_flow 任务
+        print(f"准备调用 Celery 任务")
+        print(f"输入数据: {inputData}")
         celery_app.send_task('tasks.kickoff_flow', args=[job_id, inputData])
+        print(f"Task dispatched for job_id: {job_id}")
         return {"job_id": job_id}
     except Exception as e:
         print(f"启动作业时出错:\n\n {str(e)}")

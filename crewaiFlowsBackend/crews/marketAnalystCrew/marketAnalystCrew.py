@@ -16,6 +16,8 @@ from crewai_tools import SerperDevTool, ScrapeWebsiteTool
 # 导入本应用程序提供的方法
 from utils.models import MarketStrategy, CampaignIdea, Copy
 from utils.jobManager import append_event
+from utils.manager_agent import create_manager_agent  # 引入共用manager agent工厂
+from utils.event_logger import create_event_logger  # 引入事件监听器
 
 
 # 定义了一个marketAnalystCrew类并应用了@CrewBase装饰器初始化项目
@@ -30,6 +32,8 @@ class marketAnalystCrew():
 		self.job_id = job_id
 		self.llm = llm
 		self.inputData = inputData
+		# 在初始化时创建并实例化事件监听器
+		self.event_logger = create_event_logger(job_id)
 
 	# 定义task的回调函数，在任务完成后记录输出事件
 	def append_event_callback(self,task_output):
@@ -40,7 +44,14 @@ class marketAnalystCrew():
 	@agent
 	def lead_market_analyst(self) -> Agent:
 		return Agent(
-			config=self.agents_config['lead_market_analyst'],
+			role="chief_market_analyst",  # 英文角色名
+			goal=(
+				"Conduct in-depth market analysis. "
+				"When using any tool, the Action Input must be a Python dict containing only the required parameters for the tool. "
+				"Do NOT include any extra fields like 'name', 'description', 'args_schema', 'return_direct', or 'verbose'. "
+				"Only output the parameter dict."
+			),  # 中文注释：进行深入的市场分析，工具输入必须是只包含必需参数的dict
+			backstory="An expert in market research and data analysis.",  # 中文注释：市场研究和数据分析专家
 			verbose=True,
 			llm=self.llm,
 			tools=[SerperDevTool(), ScrapeWebsiteTool()],
@@ -64,8 +75,11 @@ class marketAnalystCrew():
 		return Crew(
 			agents=self.agents,
 			tasks=self.tasks,
-			process=Process.sequential,
-			verbose=True
+			process=Process.hierarchical,
+			manager_agent=create_manager_agent(self.llm, role="project_manager"),  # 共用英文manager agent
+			verbose=True,
+			planning=True,  # 启用规划功能
+			respect_context_window=True  # 确保上下文窗口被尊重
 		)
 
 	# 定义启动Crew的函数，接受输入参数inputs

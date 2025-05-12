@@ -16,6 +16,8 @@ from crewai_tools import SerperDevTool, ScrapeWebsiteTool
 # 导入本应用程序提供的方法
 from utils.models import MarketStrategy, CampaignIdea, Copy
 from utils.jobManager import append_event
+from utils.manager_agent import create_manager_agent  # 引入共用manager agent工厂
+from utils.event_logger import create_event_logger  # 引入事件监听器
 
 
 # 定义了一个contentCreatorCrew类并应用了@CrewBase装饰器初始化项目
@@ -29,6 +31,8 @@ class contentCreatorCrew():
 		self.job_id = job_id
 		self.llm = llm
 		self.inputData = inputData
+		# 在初始化时创建并实例化事件监听器
+		self.event_logger = create_event_logger(job_id)
 
 	# 定义task的回调函数，在任务完成后记录输出事件
 	def append_event_callback(self,task_output):
@@ -39,7 +43,13 @@ class contentCreatorCrew():
 	@agent
 	def chief_marketing_strategist(self) -> Agent:
 		return Agent(
-			config=self.agents_config['chief_marketing_strategist'],
+			role="chief_marketing_strategist",  # 英文角色名
+			goal=(
+				"Responsible for developing and supervising marketing strategies. "
+				"When using any tool, the Action Input must be a Python dict containing only the required parameters for the tool. "
+				"Do NOT include any extra fields. Only output the parameter dict."
+			),  # 中文注释：负责制定和监督营销策略，工具输入必须是只包含必需参数的dict
+			backstory="A senior strategist in the field of digital marketing.",  # 中文注释：数字营销领域的资深策略师
 			verbose=True,
 			llm=self.llm,
 			tools=[SerperDevTool(), ScrapeWebsiteTool()],
@@ -47,10 +57,42 @@ class contentCreatorCrew():
 	@agent
 	def creative_content_creator(self) -> Agent:
 		return Agent(
-			config=self.agents_config['creative_content_creator'],
+			role="creative_content_creator",  # 英文角色名
+			goal=(
+				"Responsible for creating attractive and original content. "
+				"When using any tool, the Action Input must be a Python dict containing only the required parameters for the tool. "
+				"Do NOT include any extra fields. Only output the parameter dict."
+			),  # 中文注释：负责创作有吸引力且原创的内容，工具输入必须是只包含必需参数的dict
+			backstory="A professional in the field of content creation.",  # 中文注释：内容创作领域的专业人才
 			verbose=True,
 			llm=self.llm
 		)
+	
+	# # 自定义manager agent - 改为普通方法（不使用@agent装饰器）
+	# def project_manager(self) -> Agent:
+	# 	return Agent(
+	# 		role="项目经理",
+	# 		goal=(
+	# 			"协调团队成员并确保高质量完成任务。"
+	# 			"在分配任务时，必须使用准确的角色名称(例如:'首席营销策略师')，并将操作输入作为Python字典输出，而不是字符串。"
+	# 			"不要包含任何额外的字段，如'name'、'description'或'args_schema'。"
+	# 			"只输出{'coworker': ..., 'task': ..., 'context': ...}格式。"
+	# 			"例如:{'coworker': '首席营销策略师', 'task': '制定...', 'context': '...'}"
+	# 		),
+	# 		backstory="一位在项目规划和任务分配方面经验丰富的项目经理。",
+	# 		verbose=True,
+	# 		llm=self.llm,
+	# 		allow_delegation=True,
+	# 		delegation_config={
+	# 			"technique": "intent",
+	# 			"llm": self.llm,
+	# 			"prompt": (
+	# 				"在使用'分配工作给同事'工具时，操作输入必须是只包含以下键的Python字典:'coworker'、'task'、'context'。"
+	# 				"不要输出字符串，也不要包含任何额外的字段。"
+	# 				"例如:{'coworker': '首席营销策略师', 'task': '制定...', 'context': '...'}"
+	# 			)
+	# 		}
+	# 	)
 
 	# 通过@task装饰器定义一个函数，返回一个Task实例
 	@task
@@ -94,8 +136,11 @@ class contentCreatorCrew():
 		return Crew(
 			agents=self.agents,
 			tasks=self.tasks,
-			process=Process.sequential,
-			verbose=True
+			process=Process.hierarchical,
+			manager_agent=create_manager_agent(self.llm, role="project_manager"),  # 共用英文manager agent
+			verbose=True,
+			planning=True,  # 启用规划功能
+			respect_context_window=True  # 确保上下文窗口被尊重
 		)
 
 	# 定义启动Crew的函数，接受输入参数inputs

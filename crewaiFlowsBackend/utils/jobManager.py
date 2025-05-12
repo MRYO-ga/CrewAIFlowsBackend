@@ -18,7 +18,7 @@ def get_db_connection():
         conn = mysql.connector.connect(
             host='localhost',
             user='root',
-            password='Aa112233@',
+            password='0000',
             database='crewai'
         )
         if conn.is_connected():

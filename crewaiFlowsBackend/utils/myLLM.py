@@ -4,11 +4,14 @@ import os
 from crewai import LLM
 
 
+# os.environ["OPENAI_API_BASE"] = "https://yunwu.ai/v1"
+# os.environ["OPENAI_API_KEY"] = "sk-ZMQCPKllNuc0sXwa10dZsdhvkBKn0zlesmShxlsNZsotsiav"
+# os.environ["OPENAI_MODEL_NAME"] = "gpt-4o-mini"
 
 # 模型全局参数配置  根据自己的实际情况进行调整
 # openai模型相关配置 根据自己的实际情况进行调整
-OPENAI_API_BASE = "https://api.wlai.vip/v1"
-OPENAI_CHAT_API_KEY = "sk-FQZgr4fvjIv8iKaTR8QgtvEEhdS6CfFcNI1EHUTiVqD0R4hr"
+OPENAI_API_BASE = "https://yunwu.ai/v1"
+OPENAI_CHAT_API_KEY = "sk-ZMQCPKllNuc0sXwa10dZsdhvkBKn0zlesmShxlsNZsotsiav"
 OPENAI_CHAT_MODEL = "gpt-4o-mini"
 # 非gpt大模型相关配置(oneapi方案 通义千问为例) 根据自己的实际情况进行调整
 ONEAPI_API_BASE = "http://139.224.72.218:3000/v1"
