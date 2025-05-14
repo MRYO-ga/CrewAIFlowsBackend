@@ -1,0 +1,54 @@
+# 内容生成Agent的任务配置
+# 可根据需要添加任务描述、输入输出等 
+
+# content_structure_task:
+#   description: >
+#     设计内容结构框架：
+#     1. 确定内容主题和核心观点
+#     2. 设计内容分节和层次
+#     3. 规划图文内容比例
+#     4. 设置互动引导点
+#     5. 优化信息流动性
+#   expected_output: >
+#     完整的内容结构设计方案，包含各个环节的具体安排
+#   agent: content_strategist
+
+# title_generation_task:
+#   description: >
+#     生成引人注目的标题：
+#     1. 结合热点话题和关键词
+#     2. 运用情感共鸣元素
+#     3. 突出内容价值点
+#     4. 符合平台标题规范
+#     5. 考虑搜索优化
+#   expected_output: >
+#     5-10个优质标题方案，包含吸引力分析
+#   agent: copywriter
+#   context:
+#     - content_structure_task
+
+content_creation_task:
+  description: >
+    创作完整的内容：
+    1. 基于既定结构展开写作
+    2. 融入个性化表达
+    3. 注重逻辑连贯性
+    4. 增加互动性元素
+    5. 优化文案节奏
+  expected_output: >
+    一份完整的内容草稿，包含文案和图片建议
+  agent: copywriter
+
+# visual_recommendation_task:
+#   description: >
+#     提供视觉设计建议：
+#     1. 图片风格定义
+#     2. 布局方案设计
+#     3. 视觉重点规划
+#     4. 配色方案建议
+#     5. 品牌元素融入
+#   expected_output: >
+#     详细的视觉设计指南，包含具体的制作建议
+#   agent: visual_designer
+#   context:
+#     - content_creation_task 

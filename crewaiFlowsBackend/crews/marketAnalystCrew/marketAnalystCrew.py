@@ -16,14 +16,14 @@ from crewai_tools import SerperDevTool, ScrapeWebsiteTool
 # 导入本应用程序提供的方法
 from utils.models import MarketStrategy, CampaignIdea, Copy
 from utils.jobManager import append_event
-from utils.manager_agent import create_manager_agent  # 引入共用manager agent工厂
+# from utils.manager_agent import create_manager_agent  # 引入共用manager agent工厂
 from utils.event_logger import create_event_logger  # 引入事件监听器
 
 
 # 定义了一个marketAnalystCrew类并应用了@CrewBase装饰器初始化项目
 # 这个类代表一个完整的CrewAI项目
 @CrewBase
-class marketAnalystCrew():
+class CompetitorAnalysisAgent():
 
 	agents_config = 'config/agents.yaml'
 	tasks_config = 'config/tasks.yaml'
@@ -76,7 +76,6 @@ class marketAnalystCrew():
 			agents=self.agents,
 			tasks=self.tasks,
 			process=Process.hierarchical,
-			manager_agent=create_manager_agent(self.llm, role="project_manager"),  # 共用英文manager agent
 			verbose=True,
 			planning=True,  # 启用规划功能
 			respect_context_window=True  # 确保上下文窗口被尊重
@@ -85,12 +84,12 @@ class marketAnalystCrew():
 	# 定义启动Crew的函数，接受输入参数inputs
 	def kickoff(self):
 		if not self.crew():
-			append_event(self.job_id, "MarketAnalystCrew not set up")
-			return "MarketAnalystCrew not set up"
-		append_event(self.job_id, "MarketAnalystCrew's Task Started")
+			append_event(self.job_id, "CompetitorAnalysisAgent not set up")
+			return "CompetitorAnalysisAgent not set up"
+		append_event(self.job_id, "CompetitorAnalysisAgent's Task Started")
 		try:
 			results = self.crew().kickoff(inputs=self.inputData)
-			append_event(self.job_id, "MarketAnalystCrew's Task Complete")
+			append_event(self.job_id, "CompetitorAnalysisAgent's Task Complete")
 
 			return results
 		except Exception as e:

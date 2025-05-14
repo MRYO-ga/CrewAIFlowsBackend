@@ -1,6 +1,50 @@
+# 竞品分析Agent的任务配置
+# 可根据需要添加任务描述、输入输出等
+
 research_task:
     description: >
       围绕客户提供的{customer_domain}，深入分析其产品和主要竞争对手，挖掘关键趋势与相关洞察，确保收集到任何有价值的信息（限定2024年内）。当前合作项目概述如下：{project_description}。
     expected_output: >
       针对客户、客户产品以及竞争对手的全面报告，包括关键指标、市场偏好、定位策略与受众参与度分析。
     agent: lead_market_analyst
+
+competitor_search_task:
+  description: >
+    搜索并筛选相关竞品账号：
+    1. 基于关键词和领域搜索相关账号
+    2. 分析账号基础指标（粉丝数、笔记数、互动率）
+    3. 筛选出最具参考价值的前10名竞品
+    4. 记录每个竞品的特色和优势
+    5. 建立竞品监控清单
+  expected_output: >
+    一份包含前10名竞品详细信息的列表，包括基础数据和特色分析
+  agent: market_analyst
+
+competitor_analysis_task:
+  description: >
+    深入分析竞品账号的运营策略：
+    1. 账号定位和人设分析
+    2. 内容主题和风格研究
+    3. 发布频率和时间规律
+    4. 互动方式和粉丝运营
+    5. 变现模式和商业价值
+  expected_output: >
+    竞品运营策略的完整分析报告，包含可借鉴的关键策略点
+  agent: market_analyst
+  context:
+    - competitor_search_task
+
+viral_content_analysis_task:
+  description: >
+    分析竞品爆款内容的特点：
+    1. 爆款标题特征提取
+    2. 内容结构和叙事方式
+    3. 图片风格和视觉元素
+    4. 互动引导和话题设置
+    5. 传播路径和速度分析
+  expected_output: >
+    爆款内容特征总结和可复制的内容模板
+  agent: content_analyzer
+  context:
+    - competitor_search_task
+    - competitor_analysis_task

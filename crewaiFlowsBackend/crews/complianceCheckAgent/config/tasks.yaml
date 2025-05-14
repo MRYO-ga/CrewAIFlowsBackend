@@ -1,0 +1,28 @@
+# 合规检测Agent的任务配置
+# 可根据需要添加任务描述、输入输出等 
+
+compliance_check_task:
+  description: >
+    执行内容合规性检查：
+    1. 敏感词识别和分析
+    2. 违规内容检测
+    3. 广告合规性审查
+    4. 版权风险评估
+    5. 平台规则符合度检查
+  expected_output: >
+    详细的合规检查报告，包含所有潜在风险点
+  agent: compliance_officer
+
+revision_suggestion_task:
+  description: >
+    提供内容修改建议：
+    1. 敏感内容替换方案
+    2. 表达方式优化建议
+    3. 合规性调整指导
+    4. 风险规避策略
+    5. 效果保持建议
+  expected_output: >
+    具体的修改建议方案，包含替代表达示例
+  agent: content_editor
+  context:
+    - compliance_check_task 

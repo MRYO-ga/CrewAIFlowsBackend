@@ -1,0 +1,57 @@
+# 发布互动Agent的任务配置
+# 可根据需要添加任务描述、输入输出等 
+
+publication_strategy_task:
+  description: >
+    制定内容发布策略，确定最佳发布时间和标签。
+    需要考虑以下因素：
+    1. 目标受众的活跃时间段
+    2. 平台热门时段分析
+    3. 竞品发布规律研究
+    4. 内容类型与发布时间的匹配
+    5. 标签选择与热度分析
+  expected_output: >
+    一份详细的发布策略建议，包含具体的发布时间、标签选择和预期效果分析
+  agent: publication_specialist
+
+content_publication_task:
+  description: >
+    按照既定策略执行内容发布，包括：
+    1. 内容发布前的最终检查
+    2. 发布时间的精确控制
+    3. 标签和话题的准确设置
+    4. 发布后的即时状态确认
+  expected_output: >
+    发布结果报告，包含发布状态、链接和初始数据
+  agent: publication_specialist
+  context:
+    - publication_strategy_task
+
+engagement_analysis_task:
+  description: >
+    收集并分析内容的互动数据：
+    1. 浏览量、点赞、收藏、评论等基础数据
+    2. 粉丝增长和转化数据
+    3. 互动质量分析
+    4. 热门评论提取
+    5. 用户情感分析
+  expected_output: >
+    完整的互动数据统计报告，包含数据分析和优化建议
+  agent: engagement_analyst
+  context:
+    - content_publication_task
+
+comment_response_strategy_task:
+  description: >
+    制定评论回复策略：
+    1. 评论分类和优先级排序
+    2. 针对不同类型评论的回复模板
+    3. 互动话题引导方案
+    4. 危机评论处理预案
+    5. 粉丝互动增强建议
+  expected_output: >
+    详细的评论回复策略指南，包含具体的执行建议和案例
+  agent: community_manager
+  context:
+    - content_publication_task
+    - engagement_analysis_task 

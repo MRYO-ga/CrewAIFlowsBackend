@@ -56,3 +56,15 @@ def my_llm(llmType):
             # max_retries=2,# 失败重试最大次数
         )
     return llm
+
+def create_llm(llmType="openai"):
+    """
+    创建LLM实例
+    
+    Args:
+        llmType: 大语言模型类型，默认为"openai"，可选值："openai", "oneapi", "ollama"
+        
+    Returns:
+        LLM: 配置好的大语言模型实例
+    """
+    return my_llm(llmType)

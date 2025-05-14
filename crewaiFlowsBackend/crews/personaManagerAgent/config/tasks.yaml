@@ -1,0 +1,43 @@
+# 账号人设管理Agent的任务配置
+# 可根据需要添加任务描述、输入输出等 
+
+account_profile_creation_task:
+  description: >
+    创建或更新账号人设档案：
+    1. 定义账号核心价值观
+    2. 设计人格特征和语言风格
+    3. 确定专业领域和话题范围
+    4. 规划内容风格和表现形式
+    5. 制定品牌形象策略
+  expected_output: >
+    完整的账号人设档案，包含所有关键特征定义
+  agent: account_profiler
+
+audience_analysis_task:
+  description: >
+    分析目标受众特征：
+    1. 人口统计学特征分析
+    2. 兴趣爱好和消费习惯
+    3. 平台使用行为研究
+    4. 内容偏好分析
+    5. 互动习惯调查
+  expected_output: >
+    详细的受众画像报告，包含数据支持
+  agent: audience_analyst
+  context:
+    - account_profile_creation_task
+
+strategy_recommendation_task:
+  description: >
+    制定个性化运营策略：
+    1. 内容主题规划
+    2. 发布时间安排
+    3. 互动策略设计
+    4. 社群运营方案
+    5. 品牌合作建议
+  expected_output: >
+    完整的运营策略方案，包含具体执行建议
+  agent: account_profiler
+  context:
+    - account_profile_creation_task
+    - audience_analysis_task 

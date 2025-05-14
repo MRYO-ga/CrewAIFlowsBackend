@@ -16,14 +16,14 @@ from crewai_tools import SerperDevTool, ScrapeWebsiteTool
 # 导入本应用程序提供的方法
 from utils.models import MarketStrategy, CampaignIdea, Copy
 from utils.jobManager import append_event
-from utils.manager_agent import create_manager_agent  # 引入共用manager agent工厂
+# from utils.manager_agent import create_manager_agent  # 引入共用manager agent工厂
 from utils.event_logger import create_event_logger  # 引入事件监听器
 
 
 # 定义了一个contentCreatorCrew类并应用了@CrewBase装饰器初始化项目
 # 这个类代表一个完整的CrewAI项目
 @CrewBase
-class contentCreatorCrew():
+class PersonaManagerAgent():
 	agents_config = 'config/agents.yaml'
 	tasks_config = 'config/tasks.yaml'
 	# 构造初始化函数，接受job_id作为参数，用于标识作业
@@ -67,32 +67,6 @@ class contentCreatorCrew():
 			verbose=True,
 			llm=self.llm
 		)
-	
-	# # 自定义manager agent - 改为普通方法（不使用@agent装饰器）
-	# def project_manager(self) -> Agent:
-	# 	return Agent(
-	# 		role="项目经理",
-	# 		goal=(
-	# 			"协调团队成员并确保高质量完成任务。"
-	# 			"在分配任务时，必须使用准确的角色名称(例如:'首席营销策略师')，并将操作输入作为Python字典输出，而不是字符串。"
-	# 			"不要包含任何额外的字段，如'name'、'description'或'args_schema'。"
-	# 			"只输出{'coworker': ..., 'task': ..., 'context': ...}格式。"
-	# 			"例如:{'coworker': '首席营销策略师', 'task': '制定...', 'context': '...'}"
-	# 		),
-	# 		backstory="一位在项目规划和任务分配方面经验丰富的项目经理。",
-	# 		verbose=True,
-	# 		llm=self.llm,
-	# 		allow_delegation=True,
-	# 		delegation_config={
-	# 			"technique": "intent",
-	# 			"llm": self.llm,
-	# 			"prompt": (
-	# 				"在使用'分配工作给同事'工具时，操作输入必须是只包含以下键的Python字典:'coworker'、'task'、'context'。"
-	# 				"不要输出字符串，也不要包含任何额外的字段。"
-	# 				"例如:{'coworker': '首席营销策略师', 'task': '制定...', 'context': '...'}"
-	# 			)
-	# 		}
-	# 	)
 
 	# 通过@task装饰器定义一个函数，返回一个Task实例
 	@task
@@ -137,21 +111,20 @@ class contentCreatorCrew():
 			agents=self.agents,
 			tasks=self.tasks,
 			process=Process.hierarchical,
-			manager_agent=create_manager_agent(self.llm, role="project_manager"),  # 共用英文manager agent
 			verbose=True,
-			planning=True,  # 启用规划功能
+			# planning=True,  # 启用规划功能
 			respect_context_window=True  # 确保上下文窗口被尊重
 		)
 
 	# 定义启动Crew的函数，接受输入参数inputs
 	def kickoff(self):
 		if not self.crew():
-			append_event(self.job_id, "ContentCreatorCrew not set up")
-			return "ContentCreatorCrew not set up"
-		append_event(self.job_id, "ContentCreatorCrew's Task Started")
+			append_event(self.job_id, "PersonaManagerAgent not set up")
+			return "PersonaManagerAgent not set up"
+		append_event(self.job_id, "PersonaManagerAgent's Task Started")
 		try:
 			results = self.crew().kickoff(inputs=self.inputData)
-			append_event(self.job_id, "ContentCreatorCrew's Task Complete")
+			append_event(self.job_id, "PersonaManagerAgent's Task Complete")
 
 			return results
 		except Exception as e:
