@@ -8,7 +8,7 @@ from utils.myLLM import create_llm
 
 # 导入各专业Agent模块
 from crews.personaManagerAgent.persona_manager_agent import PersonaManagerAgent
-from crews.marketAnalystCrew.competitor_analysis_agent import CompetitorAnalysisAgent
+from crews.competitorAnalysisAgent.competitor_analysis_agent import CompetitorAnalysisAgent
 from crews.contentCreationAgent.content_creation_agent import ContentCreationAgent
 from crews.complianceCheckAgent.compliance_check_agent import ComplianceCheckAgent
 from crews.publicationAgent.publication_agent import PublicationAgent
@@ -47,8 +47,17 @@ def kickoff_flow(job_id, input_data):
         if isinstance(input_data, str):
             input_data = json.loads(input_data)
         
+        # 记录输入数据
+        append_event(job_id, f"收到输入数据: {json.dumps(input_data, ensure_ascii=False)}")
+        
+        # 处理新增的关键词字段
+        if 'keywords' in input_data and input_data['keywords']:
+            append_event(job_id, f"处理关键词: {', '.join(input_data['keywords'])}")
+        
         # 根据operation_type选择对应的Agent
         operation_type = input_data.get("operation_type", "")
+        task_type = input_data.get("task_type", "")
+        append_event(job_id, f"操作类型: {operation_type}, 任务类型: {task_type}")
         
         # 创建LLM实例
         llm = create_llm()
@@ -66,7 +75,7 @@ def kickoff_flow(job_id, input_data):
             注意: 输出格式必须为 {'coworker': str, 'task': str, 'context': str}
             例如: {'coworker': '首席市场分析师', 'task': '分析市场趋势', 'context': '分析背景说明'}""",
             backstory=f"""你是一个专业的小红书运营管理专家，负责协调和管理各个专业Agent完成小红书运营任务。
-            当前任务类型: {input_data.get('operation_type', '未指定')}
+            当前任务类型: {operation_type} - {task_type}
             涉及品类/主题: {input_data.get('category', '未指定')}
             具体需求: {input_data.get('requirements', '未指定')}
             {f"目标受众信息: {input_data['target_audience']}" if input_data.get('target_audience') else ""}
@@ -78,31 +87,31 @@ def kickoff_flow(job_id, input_data):
         
         if operation_type == "account_setup" or operation_type == "persona_management":
             # 账号人设管理流程
-            append_event(job_id, "启动账号人设管理流程")
+            append_event(job_id, f"启动账号人设管理流程: {task_type}")
             agent = PersonaManagerAgent(job_id, llm, input_data, manager_agent=manager)
             result = agent.kickoff()
             
         elif operation_type == "competitor_analysis":
             # 竞品分析流程
-            append_event(job_id, "启动竞品分析流程")
+            append_event(job_id, f"启动竞品分析流程: {task_type}")
             agent = CompetitorAnalysisAgent(job_id, llm, input_data, manager_agent=manager)
             result = agent.kickoff()
             
         elif operation_type == "content_creation":
             # 内容生成流程
-            append_event(job_id, "启动内容生成流程")
+            append_event(job_id, f"启动内容生成流程: {task_type}")
             agent = ContentCreationAgent(job_id, llm, input_data, manager_agent=manager)
             result = agent.kickoff()
             
         elif operation_type == "compliance_check":
             # 合规检测流程
-            append_event(job_id, "启动合规检测流程")
+            append_event(job_id, f"启动合规检测流程: {task_type}")
             agent = ComplianceCheckAgent(job_id, llm, input_data, manager_agent=manager)
             result = agent.kickoff()
             
         elif operation_type == "publication":
             # 发布互动流程
-            append_event(job_id, "启动发布互动流程")
+            append_event(job_id, f"启动发布互动流程: {task_type}")
             agent = PublicationAgent(job_id, llm, input_data, manager_agent=manager)
             result = agent.kickoff()
             

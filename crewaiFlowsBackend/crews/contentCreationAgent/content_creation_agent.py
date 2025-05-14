@@ -1,21 +1,19 @@
 # 内容生成Agent (ContentCreationAgent)
-# 该模块为小红书多Agent自动化运营系统的"智能工厂"
-# 负责基于人设和竞品策略生成小红书适配内容
+# 该模块为小红书多Agent自动化运营系统的"内容创作引擎"
+# 负责高质量小红书内容生成
 
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
-from crewai_tools import SerperDevTool, ScrapeWebsiteTool
 from typing import List, Dict, Any
-from utils.models import ContentDraft, ContentTitle, ContentStructure
+from utils.models import ContentCreation
 from utils.jobManager import append_event
-# from utils.manager_agent import create_manager_agent
 from utils.event_logger import create_event_logger
-from tools.xiaohongshu_tools import XiaoHongShuContentTool
+from tools.xiaohongshu_tool_adapters import XiaoHongShuToolAdapters
 
 @CrewBase
 class ContentCreationAgent:
     """
-    内容生成Agent - 负责生成小红书平台专属内容
+    内容生成Agent - 负责小红书高质量内容创作
     """
     agents_config = 'config/agents.yaml'
     tasks_config = 'config/tasks.yaml'
@@ -35,75 +33,29 @@ class ContentCreationAgent:
         self.input_data = input_data
         self.manager_agent = manager_agent
         self.event_logger = create_event_logger(job_id)
-        self.content_tool = XiaoHongShuContentTool()
+        self.tool_adapters = XiaoHongShuToolAdapters()
 
     def append_event_callback(self, task_output):
         append_event(self.job_id, task_output.raw)
 
-    # @agent
-    # def content_strategist(self) -> Agent:
-    #     """内容策略专家，负责内容框架和结构设计"""
-    #     return Agent(
-    #         config=self.agents_config['content_strategist'],
-    #         # tools=[self.content_tool],
-    #         verbose=True,
-    #         memory=False,
-    #         llm=self.llm
-    #     )
-        
     @agent
-    def copywriter(self) -> Agent:
-        """文案创作专家，负责撰写标题和正文"""
+    def content_creator(self) -> Agent:
+        """内容创建者Agent，负责生成高质量内容"""
         return Agent(
-            config=self.agents_config['copywriter'],
-            # tools=[self.content_tool],
+            config=self.agents_config['content_creator'],
+            tools=self.tool_adapters.get_content_creator_tools(),
             verbose=True,
             memory=False,
             llm=self.llm
         )
-        
-    # @agent
-    # def visual_designer(self) -> Agent:
-    #     """视觉设计Agent，负责图片风格和排版建议"""
-    #     return Agent(
-    #         config=self.agents_config['visual_designer'],
-    #         tools=[self.content_tool],
-    #         verbose=True,
-    #         memory=False,
-    #         llm=self.llm
-    #     )
 
-    # @task
-    # def content_structure_task(self) -> Task:
-    #     return Task(
-    #         config=self.tasks_config['content_structure_task'],
-    #         callback=self.append_event_callback,
-    #         output_json=ContentStructure
-    #     )
-        
-    # @task
-    # def title_generation_task(self) -> Task:
-    #     return Task(
-    #         config=self.tasks_config['title_generation_task'],
-    #         callback=self.append_event_callback,
-    #         output_json=ContentTitle
-    #     )
-        
     @task
     def content_creation_task(self) -> Task:
         return Task(
             config=self.tasks_config['content_creation_task'],
             callback=self.append_event_callback,
-            # output_json=ContentDraft
+            output_json=ContentCreation
         )
-        
-    # @task
-    # def visual_recommendation_task(self) -> Task:
-    #     return Task(
-    #         config=self.tasks_config['visual_recommendation_task'],
-    #         callback=self.append_event_callback,
-    #         output_json=None
-    #     )
 
     @crew
     def crew(self) -> Crew:
@@ -114,7 +66,6 @@ class ContentCreationAgent:
             manager_agent=self.manager_agent,
             process=Process.hierarchical,
             verbose=True,
-            # planning=True,
             respect_context_window=True
         )
 
@@ -132,7 +83,7 @@ class ContentCreationAgent:
         except Exception as e:
             append_event(self.job_id, f"An error occurred: {e}")
             return str(e)
-            
+
     # 辅助方法，用于获取生成的内容
     def get_generated_content(self, content_id: str = None) -> Dict[str, Any]:
         """

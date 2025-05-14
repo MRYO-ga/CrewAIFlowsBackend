@@ -26,26 +26,19 @@ class Copy(BaseModel):
 # 账号人设管理Agent模型
 class AccountProfile(BaseModel):
     """账号档案模型"""
-    account_id: str = Field(..., description="小红书账号ID")
     account_name: str = Field(..., description="账号名称")
-    profile_image: Optional[str] = Field(None, description="头像图片URL")
     bio: str = Field(..., description="账号简介")
-    categories: List[str] = Field(..., description="账号分类标签")
-    persona: Dict[str, Any] = Field(..., description="账号人设定义，包括性格、语调、风格等")
-    target_audience: Dict[str, Any] = Field(..., description="目标受众群体定义")
-    brand_values: List[str] = Field(..., description="品牌价值观")
-    content_themes: List[str] = Field(..., description="内容主题方向")
+    avatar_style: str = Field(..., description="头像风格描述")
+    key_tags: List[str] = Field(..., description="关键标签列表")
+    tone_style: str = Field(..., description="语言风格")
 
 class FansProfile(BaseModel):
     """粉丝画像模型"""
-    account_id: str = Field(..., description="小红书账号ID")
-    gender_ratio: Dict[str, float] = Field(..., description="性别比例，如{'female': 75, 'male': 25}")
-    age_groups: Dict[str, float] = Field(..., description="年龄分布，如{'18-24': 30, '25-34': 45, '35+': 25}")
-    geo_distribution: Dict[str, float] = Field(..., description="地理分布，如{'北京': 20, '上海': 15}")
-    interests: List[str] = Field(..., description="兴趣偏好")
-    active_time: List[str] = Field(..., description="活跃时间段")
-    engagement_patterns: Dict[str, Any] = Field(..., description="互动模式分析")
-    content_preferences: Dict[str, Any] = Field(..., description="内容偏好分析")
+    demographic: Dict[str, Any] = Field(..., description="人口统计学特征")
+    interests: List[str] = Field(..., description="兴趣爱好")
+    behavior_patterns: Dict[str, Any] = Field(..., description="平台行为模式")
+    content_preferences: List[str] = Field(..., description="内容偏好")
+    interaction_habits: Dict[str, Any] = Field(..., description="互动习惯")
 
 # 竞品分析Agent模型
 class CompetitorAnalysis(BaseModel):
@@ -134,3 +127,36 @@ class InteractionStats(BaseModel):
     audience_engagement: Dict[str, Any] = Field(..., description="受众互动分析")
     performance_assessment: str = Field(..., description="表现评估")
     optimization_recommendations: List[str] = Field(..., description="优化建议")
+
+class ContentPlan(BaseModel):
+    """内容规划模型"""
+    main_topics: List[str] = Field(..., description="主要内容主题")
+    content_ratio: Dict[str, int] = Field(..., description="内容类型占比(%)")
+    posting_schedule: str = Field(..., description="发布时间策略")
+    interaction_strategy: str = Field(..., description="互动策略")
+    trending_topics: List[str] = Field(..., description="推荐结合的热点话题")
+
+class TrendReport(BaseModel):
+    """平台趋势报告模型"""
+    hot_topics: List[Dict[str, Any]] = Field(..., description="热门话题及增长趋势")
+    content_forms: Dict[str, int] = Field(..., description="内容形式占比(%)")
+    language_features: List[str] = Field(..., description="高互动内容语言特征")
+    opportunity_topics: List[str] = Field(..., description="潜在机会点话题")
+    trend_prediction: str = Field(..., description="未来趋势预测")
+
+class CompetitorMatrix(BaseModel):
+    """竞品策略矩阵模型"""
+    topic_coverage: Dict[str, List[str]] = Field(..., description="各竞品主题覆盖情况")
+    format_innovation: Dict[str, List[str]] = Field(..., description="各竞品内容形式创新点")
+    style_positioning: Dict[str, Dict[str, int]] = Field(..., description="各竞品风格定位坐标")
+    strengths_weaknesses: Dict[str, Dict[str, List[str]]] = Field(..., description="各竞品优劣势")
+    differentiation_suggestion: str = Field(..., description="差异化策略建议")
+
+class ContentCreation(BaseModel):
+    """内容创作模型"""
+    title: str = Field(..., description="内容标题")
+    content_type: str = Field(..., description="内容类型(图文/视频)")
+    content_body: str = Field(..., description="内容正文")
+    visual_suggestion: str = Field(..., description="视觉呈现建议")
+    interaction_guide: str = Field(..., description="互动引导语")
+    hashtags: List[str] = Field(..., description="推荐话题标签")

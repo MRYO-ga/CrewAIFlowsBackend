@@ -1,43 +1,42 @@
 # 账号人设管理Agent的任务配置
-# 可根据需要添加任务描述、输入输出等 
 
-account_profile_creation_task:
+account_info_creation_task:
   description: >
-    创建或更新账号人设档案：
-    1. 定义账号核心价值观
-    2. 设计人格特征和语言风格
-    3. 确定专业领域和话题范围
-    4. 规划内容风格和表现形式
-    5. 制定品牌形象策略
+    创建和优化小红书账号基础信息：
+    1. 设计吸引力强的账号名称
+    2. 撰写专业且富有吸引力的简介
+    3. 规划头像和背景图设计方向
+    4. 设置关键标签和搜索关键词
+    5. 优化账号基础信息的展示效果
   expected_output: >
-    完整的账号人设档案，包含所有关键特征定义
-  agent: account_profiler
+    完整的账号基础信息方案，包含所有关键信息的具体建议
+  agent: account_info_writer
 
-audience_analysis_task:
+persona_development_task:
   description: >
-    分析目标受众特征：
-    1. 人口统计学特征分析
-    2. 兴趣爱好和消费习惯
-    3. 平台使用行为研究
-    4. 内容偏好分析
-    5. 互动习惯调查
+    构建独特的账号人设定位：
+    1. 分析目标领域和竞品差异
+    2. 设计独特的人设特质矩阵
+    3. 制定人设故事化表达方案
+    4. 规划差异化竞争策略
+    5. 设计人设传播和互动策略
   expected_output: >
-    详细的受众画像报告，包含数据支持
-  agent: audience_analyst
+    详细的账号人设定位方案，包含完整的人设构建策略
+  agent: unique_persona_builder
   context:
-    - account_profile_creation_task
+    - account_info_creation_task
 
-strategy_recommendation_task:
+content_planning_task:
   description: >
-    制定个性化运营策略：
-    1. 内容主题规划
-    2. 发布时间安排
-    3. 互动策略设计
-    4. 社群运营方案
-    5. 品牌合作建议
+    规划账号内容发展方向：
+    1. 制定主题内容框架
+    2. 设计内容矩阵和选题方向
+    3. 规划内容发布节奏
+    4. 设计用户互动策略
+    5. 制定热点结合计划
   expected_output: >
-    完整的运营策略方案，包含具体执行建议
-  agent: account_profiler
+    完整的内容规划方案，包含具体的执行建议
+  agent: content_direction_planner
   context:
-    - account_profile_creation_task
-    - audience_analysis_task 
+    - account_info_creation_task
+    - persona_development_task 

@@ -1,0 +1,27 @@
+# 竞品分析Agent的任务配置
+
+platform_trend_decoding_task:
+  description: >
+    分析平台内容生态趋势：
+    1. 提取目标领域热门标签及其增长趋势
+    2. 统计主流内容形式及其占比
+    3. 分析高互动笔记的语言特征
+    4. 识别潜在的内容机会点
+    5. 生成趋势预测报告
+  expected_output: >
+    完整的《季度平台趋势报告》，包含热门话题、内容形式和风格偏好分析
+  agent: platform_trend_decoder
+
+content_style_analysis_task:
+  description: >
+    深度分析竞品内容策略：
+    1. 统计竞品主题覆盖度
+    2. 评估竞品内容形式创新性
+    3. 建立竞品风格坐标定位
+    4. 识别竞品内容优劣势
+    5. 提出差异化建议
+  expected_output: >
+    详细的《竞品内容策略矩阵表》，包含竞品定位和差异化机会分析
+  agent: content_style_analyst
+  context:
+    - platform_trend_decoding_task 
