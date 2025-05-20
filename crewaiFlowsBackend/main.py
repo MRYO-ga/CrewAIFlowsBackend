@@ -21,9 +21,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from utils.jobManager import append_event, get_job_by_id, update_job_by_id
-from utils.myLLM import create_llm
+from utils.myLLM import create_llm, interact_with_intent_agent
 from tasks import app as celery_app
 # from utils.manager_agent import create_manager_agent
 
@@ -32,17 +32,47 @@ from tasks import app as celery_app
 PORT = 8012
 
 
+# 定义子Agent配置模型
+class AgentConfig(BaseModel):
+    account_info_writer: Optional[bool] = Field(None, description="账号基础信息撰写Agent")
+    unique_persona_builder: Optional[bool] = Field(None, description="独特人设定位构建Agent")
+    content_direction_planner: Optional[bool] = Field(None, description="主题内容方向规划Agent")
+
+
+# 定义内容创作配置模型
+class ContentCreationConfig(BaseModel):
+    content_creator: Optional[bool] = Field(None, description="内容创作Agent")
+
+
+# 定义竞品分析配置模型
+class CompetitorAnalysisConfig(BaseModel):
+    platform_trend_decoder: Optional[bool] = Field(None, description="平台趋势解析Agent")
+    content_style_analyst: Optional[bool] = Field(None, description="内容风格分析Agent")
+
+
+# 定义Crew配置模型
+class CrewConfig(BaseModel):
+    persona_management: Optional[Union[Dict[str, bool], AgentConfig, str]] = Field(None, description="人设管理模块配置，支持对象或字符串")
+    competitor_analysis: Optional[Union[Dict[str, bool], CompetitorAnalysisConfig, str]] = Field(None, description="竞品分析模块配置，支持对象或字符串")
+    content_creation: Optional[Union[Dict[str, bool], ContentCreationConfig, str]] = Field(None, description="内容创作模块配置，支持对象或字符串")
+    compliance_check: Optional[str] = Field(None, description="合规检测模块配置")
+    publication: Optional[str] = Field(None, description="发布互动模块配置")
+
+
 # 定义输入数据模型 - 小红书自动化运营系统请求
 class XiaoHongShuRequest(BaseModel):
     """小红书自动化运营系统请求模型"""
-    account_id: Optional[str] = Field(None, description="小红书账号ID，如有")
-    operation_type: str = Field(..., description="操作类型，如'account_setup'、'competitor_analysis'、'content_creation'等")
-    category: str = Field(..., description="操作涉及的品类/主题")
     requirements: str = Field(..., description="详细需求描述")
-    target_audience: Optional[Dict[str, Any]] = Field(None, description="目标受众信息")
-    keywords: Optional[List[str]] = Field(None, description="关键词列表")
     reference_urls: Optional[List[str]] = Field(None, description="参考链接")
     additional_data: Optional[Dict[str, Any]] = Field(None, description="其他附加数据")
+    crew: Optional[CrewConfig] = Field(None, description="子Agent配置")
+
+
+# 定义对话请求模型
+class ChatRequest(BaseModel):
+    """对话请求模型"""
+    user_input: str = Field(..., description="用户输入的消息")
+    conversation_history: Optional[List[Dict[str, Any]]] = Field(None, description="对话历史")
 
 
 # 定义了一个异步函数lifespan，它接收一个FastAPI应用实例app作为参数。这个函数将管理应用的生命周期，包括启动和关闭时的操作
@@ -79,6 +109,27 @@ app.add_middleware(
 )
 
 
+# POST接口 /api/chat，与意图解析Agent进行对话
+@app.post("/api/chat")
+async def chat_with_agent(request: ChatRequest):
+    try:
+        # 调用意图解析Agent
+        result = interact_with_intent_agent(
+            request.user_input,
+            request.conversation_history
+        )
+        
+        # 如果data非空且包含完整信息，则表示对话已完成
+        if result.get("data") and result["data"].get("crew"):
+            print(f"对话完成，解析结果: {result['data']}")
+        
+        return result
+        
+    except Exception as e:
+        print(f"对话处理出错: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # POST接口 /api/crew，开启一次作业运行flow
 @app.post("/api/crew")
 async def run_flow(request: XiaoHongShuRequest):
@@ -88,28 +139,39 @@ async def run_flow(request: XiaoHongShuRequest):
         
         # 构建输入数据
         input_data = {
-            "operation_type": request.operation_type,
-            "category": request.category,
             "requirements": request.requirements,
-            "account_id": request.account_id,
-            "target_audience": request.target_audience,
-            "keywords": request.keywords,
             "reference_urls": request.reference_urls,
             "additional_data": request.additional_data
         }
         
+        # 添加crew配置
+        if request.crew:
+            # 转换为字典格式以便于JSON序列化
+            crew_dict = request.crew.dict(exclude_none=True)
+            
+            # 为了兼容性，检查每个模块的配置格式
+            for module, config in crew_dict.items():
+                # 如果是字典，保持原样
+                if isinstance(config, dict):
+                    print(f"模块 {module} 使用对象配置: {config}")
+                # 如果是字符串或其它类型，不做处理
+                else:
+                    print(f"模块 {module} 使用字符串配置: {config}")
+            
+            input_data["crew"] = crew_dict
+            print(f"完整的crew配置: {json.dumps(crew_dict, ensure_ascii=False)}")
+        
         # 记录初始事件
         initial_event = {
             "event_type": "job_created",
-            "operation_type": request.operation_type,
-            "category": request.category,
+            "requirements": request.requirements,
             "input_data": input_data
         }
-        append_event(job_id, json.dumps(initial_event))
+        append_event(job_id, json.dumps(initial_event, ensure_ascii=False))
         
         # 使用 Celery 调用 kickoff_flow 任务
         print(f"准备调用 Celery 任务")
-        print(f"输入数据: {input_data}")
+        print(f"输入数据: {json.dumps(input_data, ensure_ascii=False)}")
         celery_app.send_task('tasks.kickoff_flow', args=[job_id, input_data])
         print(f"任务已分发，作业ID: {job_id}")
         
