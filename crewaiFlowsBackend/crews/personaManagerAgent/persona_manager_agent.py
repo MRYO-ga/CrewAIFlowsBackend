@@ -236,7 +236,7 @@ class PersonaManagerAgent:
             description=config['description'],
             expected_output=config['expected_output'],
             callback=self.append_event_callback,
-            output_json=AccountProfile
+            # output_json=AccountProfile
         )
         
     @task
@@ -255,7 +255,7 @@ class PersonaManagerAgent:
             description=config['description'],
             expected_output=config['expected_output'],
             callback=self.append_event_callback,
-            output_json=AccountProfile
+            # output_json=AccountProfile
         )
         
     @task
@@ -274,7 +274,7 @@ class PersonaManagerAgent:
             description=config['description'],
             expected_output=config['expected_output'],
             callback=self.append_event_callback,
-            output_json=ContentPlan
+            # output_json=ContentPlan
         )
 
     @crew

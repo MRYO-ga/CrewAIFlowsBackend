@@ -6,8 +6,24 @@ from threading import Lock
 import mysql.connector
 from mysql.connector import Error
 
-# 设置日志记录
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# 配置根日志记录器
+logging.getLogger().setLevel(logging.ERROR)
+
+# 配置Celery的日志记录器
+logging.getLogger('celery').setLevel(logging.ERROR)
+
+# 配置当前模块的日志记录器
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
+
+# 配置日志格式
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# 添加控制台处理器
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.ERROR)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
 # 创建一个锁，用于保护数据库操作的线程安全
 jobs_lock = Lock()
@@ -24,7 +40,7 @@ def get_db_connection():
         if conn.is_connected():
             return conn
     except Error as e:
-        logging.error(f"Error connecting to MySQL: {e}")
+        logger.error(f"Error connecting to MySQL: {e}")
         return None
 
 # 初始化连接
@@ -52,9 +68,9 @@ if conn:
         ''')
         conn.commit()
     except Error as e:
-        logging.error(f"Error creating tables: {e}")
+        logger.error(f"Error creating tables: {e}")
 else:
-    logging.critical("Failed to establish initial connection to MySQL.")
+    logger.critical("Failed to establish initial connection to MySQL.")
 
 # 定义一个 Event 类，表示事件的结构
 @dataclass
@@ -86,11 +102,11 @@ def append_event(job_id: str, event_data: str):
 
             if job is None:
                 # 如果不存在，创建一个新的 Job 记录
-                logging.info(f"Job {job_id} started")
+                logger.info(f"Job {job_id} started")
                 cursor.execute("INSERT INTO jobs (job_id, status, result) VALUES (%s, %s, %s)",
                                (job_id, 'STARTED', ''))
             else:
-                logging.info(f"Appending event for job {job_id}: {event_data}")
+                logger.info(f"Appending event for job {job_id}: {event_data}")
 
             # 创建一个新的 Event 记录
             cursor.execute("INSERT INTO events (job_id, timestamp, data) VALUES (%s, %s, %s)",
@@ -100,9 +116,9 @@ def append_event(job_id: str, event_data: str):
             conn.commit()
 
         except Error as e:
-            logging.error(f"Error appending event for job {job_id}: {e}")
+            logger.error(f"Error appending event for job {job_id}: {e}")
         except Exception as e:
-            logging.error(f"Unexpected error: {e}")
+            logger.error(f"Unexpected error: {e}")
         finally:
             if conn.is_connected():
                 cursor.close()
@@ -125,7 +141,7 @@ def update_job_by_id(job_id: str, status: str, result: str, event_data: List[str
             job = cursor.fetchone()
 
             if job is None:
-                logging.warning(f"Job {job_id} not found. Cannot update.")
+                logger.warning(f"Job {job_id} not found. Cannot update.")
                 return
 
             # 更新 job 的 status 和 result
@@ -140,12 +156,12 @@ def update_job_by_id(job_id: str, status: str, result: str, event_data: List[str
             # 提交更改
             conn.commit()
 
-            logging.info(f"Job {job_id} updated successfully.")
+            logger.info(f"Job {job_id} updated successfully.")
 
         except Error as e:
-            logging.error(f"Error updating job {job_id}: {e}")
+            logger.error(f"Error updating job {job_id}: {e}")
         except Exception as e:
-            logging.error(f"Unexpected error: {e}")
+            logger.error(f"Unexpected error: {e}")
         finally:
             if conn.is_connected():
                 cursor.close()
@@ -168,7 +184,7 @@ def get_job_by_id(job_id: str) -> Job:
             job_data = cursor.fetchone()
 
             if job_data is None:
-                logging.warning(f"Job {job_id} not found.")
+                logger.warning(f"Job {job_id} not found.")
                 return None
 
             # 从 events 表中检索与该作业相关的所有事件
@@ -183,9 +199,9 @@ def get_job_by_id(job_id: str) -> Job:
             return job
 
         except Error as e:
-            logging.error(f"Error retrieving job {job_id}: {e}")
+            logger.error(f"Error retrieving job {job_id}: {e}")
         except Exception as e:
-            logging.error(f"Unexpected error: {e}")
+            logger.error(f"Unexpected error: {e}")
         finally:
             if conn.is_connected():
                 cursor.close()

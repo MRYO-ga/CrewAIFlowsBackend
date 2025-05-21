@@ -833,7 +833,7 @@ class GetUserAllNotesTool(BaseTool):
     description: str = "提取竞品笔记内容，识别高频出现的人设关键词（如'专业教练'、'宝妈'），避免定位重复"
     args_schema: Type[BaseModel] = UserAllNotesInput
     
-    def _run(self, user_id: str, limit: int = 50) -> Dict[str, Any]:
+    def _run(self, user_id: str, limit: int = 10) -> Dict[str, Any]:
         """
         获取用户所有笔记
         

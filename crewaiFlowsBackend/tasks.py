@@ -1,12 +1,22 @@
 # 导入标准库
 import os
 import json
+import logging
+from celery.signals import setup_logging
 # 导入第三方库
 from celery import Celery
 from crewai.flow.flow import Flow, listen, start
 from utils.jobManager import append_event, get_job_by_id, update_job_by_id
 from utils.myLLM import create_llm
 from crewai import Agent
+
+# 配置Celery的日志级别
+@setup_logging.connect
+def setup_celery_logging(**kwargs):
+    logging.getLogger('celery').setLevel(logging.ERROR)
+    
+# 配置全局日志级别
+logging.getLogger().setLevel(logging.ERROR)
 
 # 导入各专业Agent模块（这些就是Crew的实现）
 from crews.personaManagerAgent.persona_manager_agent import PersonaManagerAgent
@@ -35,10 +45,10 @@ app = Celery('tasks', broker='redis://127.0.0.1:6379/0')
 class XHSWorkflow(Flow):
     """小红书多Agent自动化运营系统工作流"""
     
-    def __init__(self, job_id, llm, input_data, manager_agent):
+    def __init__(self, job_id, input_data, manager_agent):
         super().__init__()
         self.job_id = job_id
-        self.llm = llm
+        self.llm = create_llm(llmType="openai", model="gpt-4o-mini")
         self.input_data = input_data
         self.manager_agent = manager_agent
         self.results = {}
@@ -168,7 +178,7 @@ def kickoff_flow(job_id, input_data):
         append_event(job_id, f"收到输入数据: {json.dumps(input_data, ensure_ascii=False)}")
         
         # 创建LLM实例
-        llm = create_llm()
+        llm = create_llm(llmType="openai", model="gpt-4o")
         
         # 创建manager agent
         manager_agent = Agent(
@@ -179,9 +189,7 @@ def kickoff_flow(job_id, input_data):
             3. 分配和协调各个专业Agent的工作
             4. 监控任务执行进度
             5. 确保最终输出符合要求
-            
-            注意: 输出格式必须为 {'coworker': str, 'task': str, 'context': str}
-            例如: {'coworker': '首席市场分析师', 'task': '分析市场趋势', 'context': '分析背景说明'}""",
+            """,
             backstory=f"""你是一个专业的小红书运营管理专家，负责协调和管理各个专业Agent完成小红书运营任务。
             具体需求: {input_data.get('requirements', '未指定')}""",
             llm=llm,
@@ -195,7 +203,7 @@ def kickoff_flow(job_id, input_data):
             append_event(job_id, f"配置的模块: {list(input_data['crew'].keys())}")
             
             # 使用Flow方式执行多Agent流程
-            workflow = XHSWorkflow(job_id, llm, input_data, manager_agent)
+            workflow = XHSWorkflow(job_id, input_data, manager_agent)
             workflow.kickoff()
             
             # 获取最终结果
