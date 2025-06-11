@@ -1,0 +1,1708 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SocialPulse AI - 智能社交媒体运营助手</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#165DFF',
+            secondary: '#FF7D00',
+            success: '#00B42A',
+            warning: '#FF7D00',
+            danger: '#F53F3F',
+            dark: '#1D2129',
+            'gray-100': '#F2F3F5',
+            'gray-200': '#E5E6EB',
+            'gray-300': '#C9CDD4',
+            'gray-400': '#86909C',
+            'gray-500': '#4E5969',
+          },
+          fontFamily: {
+            inter: ['Inter', 'sans-serif'],
+          },
+          boxShadow: {
+            'card': '0 4px 20px rgba(0, 0, 0, 0.08)',
+            'hover': '0 8px 30px rgba(0, 0, 0, 0.12)',
+          }
+        },
+      }
+    }
+  </script>
+  
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      .bg-gradient-blue {
+        background: linear-gradient(135deg, #165DFF 0%, #4080FF 100%);
+      }
+      .text-gradient {
+        background-clip: text;
+        -webkit-background-clip: text;
+        color: transparent;
+        background-image: linear-gradient(135deg, #165DFF 0%, #4080FF 100%);
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.3s ease-in-out;
+      }
+      .animate-slide-up {
+        animation: slideUp 0.4s ease-out;
+      }
+      .animate-pulse-slow {
+        animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes slideUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+      }
+    }
+  </style>
+</head>
+
+<body class="font-inter bg-gray-100 text-dark min-h-screen flex flex-col">
+  <!-- 顶部导航栏 -->
+  <header class="bg-white shadow-sm sticky top-0 z-50 transition-all duration-300" id="navbar">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <!-- 左侧Logo和标题 -->
+        <div class="flex items-center space-x-2">
+          <div class="w-10 h-10 rounded-lg bg-gradient-blue flex items-center justify-center">
+            <i class="fa-solid fa-bolt text-white text-xl"></i>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold text-dark">SocialPulse<span class="text-primary">AI</span></h1>
+            <p class="text-xs text-gray-400">智能社交媒体运营助手</p>
+          </div>
+        </div>
+        
+        <!-- 中间搜索栏 -->
+        <div class="hidden md:flex items-center mx-4 flex-1 max-w-md">
+          <div class="relative w-full">
+            <input type="text" placeholder="搜索历史对话或功能..." 
+                  class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all" />
+            <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+          </div>
+        </div>
+        
+        <!-- 右侧用户信息 -->
+        <div class="flex items-center space-x-4">
+          <button class="p-2 rounded-full hover:bg-gray-100 transition-colors relative">
+            <i class="fa-solid fa-bell text-gray-500"></i>
+            <span class="absolute top-1 right-1 w-2 h-2 bg-danger rounded-full"></span>
+          </button>
+          <button class="p-2 rounded-full hover:bg-gray-100 transition-colors">
+            <i class="fa-solid fa-cog text-gray-500"></i>
+          </button>
+          <div class="flex items-center space-x-2">
+            <img src="https://picsum.photos/id/1005/200/200" alt="用户头像" class="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" />
+            <span class="hidden sm:block text-sm font-medium">张运营</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主要内容区域 -->
+  <main class="flex-1 flex overflow-hidden">
+    <!-- 左侧边栏 -->
+    <aside class="w-64 bg-white shadow-sm hidden md:block transition-all duration-300" id="sidebar">
+      <div class="py-4 px-3 h-full flex flex-col">
+        <!-- 主导航 -->
+        <nav class="flex-1">
+          <ul class="space-y-1">
+            <li class="mb-2">
+              <span class="text-xs font-semibold text-gray-400 px-3">主功能区</span>
+            </li>
+            <li>
+              <a href="#" class="flex items-center px-3 py-2.5 rounded-lg bg-primary/10 text-primary font-medium transition-all" data-page="chatPage">
+                <i class="fa-solid fa-comments w-5 h-5 mr-3"></i>
+                <span>智能对话</span>
+              </a>
+            </li>
+            <li>
+              <a href="#" class="flex items-center px-3 py-2.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-all" data-page="taskPage">
+                <i class="fa-solid fa-clipboard-list w-5 h-5 mr-3"></i>
+                <span>任务中心</span>
+              </a>
+            </li>
+            <li>
+              <a href="#" class="flex items-center px-3 py-2.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-all" data-page="analyticsPage">
+                <i class="fa-solid fa-line-chart w-5 h-5 mr-3"></i>
+                <span>数据分析</span>
+              </a>
+            </li>
+            <li>
+              <a href="#" class="flex items-center px-3 py-2.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-all" data-page="competitorPage">
+                <i class="fa-solid fa-magnifying-glass-chart w-5 h-5 mr-3"></i>
+                <span>竞品分析</span>
+              </a>
+            </li>
+            <li>
+              <a href="#" class="flex items-center px-3 py-2.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-all" data-page="contentPage">
+                <i class="fa-solid fa-file-text w-5 h-5 mr-3"></i>
+                <span>内容库</span>
+              </a>
+            </li>
+            <li>
+              <a href="#" class="flex items-center px-3 py-2.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-all" data-page="schedulePage">
+                <i class="fa-solid fa-calendar w-5 h-5 mr-3"></i>
+                <span>发布计划</span>
+              </a>
+            </li>
+            
+            <li class="mt-6 mb-2">
+              <span class="text-xs font-semibold text-gray-400 px-3">快速访问</span>
+            </li>
+            <li>
+              <a href="#" class="flex items-center px-3 py-2.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-all">
+                <i class="fa-solid fa-bookmark w-5 h-5 mr-3"></i>
+                <span>收藏的分析</span>
+              </a>
+            </li>
+            <li>
+              <a href="#" class="flex items-center px-3 py-2.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-all">
+                <i class="fa-solid fa-clock-rotate-left w-5 h-5 mr-3"></i>
+                <span>最近历史</span>
+              </a>
+            </li>
+          </ul>
+        </nav>
+        
+        <!-- 底部快捷操作 -->
+        <div class="pt-4 border-t border-gray-200">
+          <button class="w-full py-2.5 px-3 rounded-lg bg-gradient-blue text-white font-medium flex items-center justify-center space-x-2 hover:shadow-lg transition-all">
+            <i class="fa-solid fa-plus"></i>
+            <span>新建项目</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 中间对话区域 -->
+    <section class="flex-1 flex flex-col bg-gray-50 overflow-hidden">
+      <!-- 页面内容 -->
+      <div id="pageContent">
+        <!-- 智能对话页面 -->
+        <div id="chatPage" class="h-full flex flex-col">
+          <!-- 对话头部 -->
+          <div class="bg-white shadow-sm px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <button class="md:hidden p-2 rounded-lg hover:bg-gray-100" id="sidebarToggle">
+                <i class="fa-solid fa-bars text-gray-500"></i>
+              </button>
+              <h2 class="text-lg font-semibold">小红书美妆账号运营助手</h2>
+              <span class="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">在线</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <button class="p-2 rounded-lg hover:bg-gray-100" title="导出对话">
+                <i class="fa-solid fa-download text-gray-500"></i>
+              </button>
+              <button class="p-2 rounded-lg hover:bg-gray-100" title="清空对话">
+                <i class="fa-solid fa-trash text-gray-500"></i>
+              </button>
+            </div>
+          </div>
+          
+          <!-- 对话内容区域 -->
+          <div class="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide" id="chatContainer">
+            <!-- 欢迎消息 -->
+            <div class="animate-fade-in">
+              <div class="flex items-start space-x-3">
+                <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                  <i class="fa-solid fa-robot text-white"></i>
+                </div>
+                <div class="max-w-[90%]">
+                  <div class="bg-white rounded-lg rounded-tl-none shadow-card p-4">
+                    <p class="text-dark">👋 你好！我是SocialPulse AI，你的智能社交媒体运营助手。我可以帮你分析账号定位、拆解竞品、生成内容，还能管理多平台账号。</p>
+                    <p class="text-dark mt-2">请问有什么可以帮助你的？比如：</p>
+                    <ul class="mt-2 space-y-1 text-sm text-gray-500">
+                      <li>• 帮我分析小红书美妆账号定位</li>
+                      <li>• 查找3个美妆类头部竞品账号</li>
+                      <li>• 生成5条适合油皮的内容选题</li>
+                    </ul>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-1">刚刚</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 用户消息1 -->
+            <div class="animate-fade-in">
+              <div class="flex items-start justify-end space-x-3">
+                <div class="max-w-[90%]">
+                  <div class="bg-primary text-white rounded-lg rounded-tr-none p-4">
+                    <p>你好，我想做一个小红书美妆账号，主要面向18-25岁的学生群体，主打平价好物和新手化妆教程，应该怎么定位？</p>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-1 flex justify-end">10:23</div>
+                </div>
+                <div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                  <img src="https://picsum.photos/id/1005/200/200" alt="用户头像" class="w-full h-full object-cover">
+                </div>
+              </div>
+            </div>
+            
+            <!-- AI回复1 - 账号定位分析 -->
+            <div class="animate-fade-in">
+              <div class="flex items-start space-x-3">
+                <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                  <i class="fa-solid fa-robot text-white"></i>
+                </div>
+                <div class="max-w-[90%]">
+                  <div class="bg-white rounded-lg rounded-tl-none shadow-card p-4">
+                    <h3 class="font-semibold text-lg mb-3">📌 小红书美妆账号定位分析</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div class="bg-gray-50 p-3 rounded-lg">
+                        <h4 class="font-medium text-sm text-gray-500 mb-2">目标人群</h4>
+                        <div class="space-y-1">
+                          <div class="flex items-center justify-between">
+                            <span class="text-sm">年龄范围</span>
+                            <span class="font-medium">18-25岁</span>
+                          </div>
+                          <div class="flex items-center justify-between">
+                            <span class="text-sm">用户画像</span>
+                            <span class="font-medium">学生党、初入职场</span>
+                          </div>
+                          <div class="flex items-center justify-between">
+                            <span class="text-sm">消费能力</span>
+                            <span class="font-medium">中低价位（100-300元）</span>
+                          </div>
+                          <div class="flex items-center justify-between">
+                            <span class="text-sm">核心需求</span>
+                            <span class="font-medium">性价比、新手友好、快速上手</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div class="bg-gray-50 p-3 rounded-lg">
+                        <h4 class="font-medium text-sm text-gray-500 mb-2">人设建议</h4>
+                        <div class="space-y-1">
+                          <div class="flex items-center justify-between">
+                            <span class="text-sm">身份标签</span>
+                            <span class="font-medium">学生美妆博主</span>
+                          </div>
+                          <div class="flex items-center justify-between">
+                            <span class="text-sm">风格定位</span>
+                            <span class="font-medium">邻家女孩、真实测评</span>
+                          </div>
+                          <div class="flex items-center justify-between">
+                            <span class="text-sm">差异化点</span>
+                            <span class="font-medium">宿舍化妆、平价替代、学生党专属优惠</span>
+                          </div>
+                          <div class="flex items-center justify-between">
+                            <span class="text-sm">语言风格</span>
+                            <span class="font-medium">活泼、口语化、带点小吐槽</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="p-3 bg-primary/5 border border-primary/20 rounded-lg mb-4">
+                      <h4 class="font-medium text-primary flex items-center">
+                        <i class="fa-solid fa-lightbulb mr-2"></i>
+                        小建议
+                      </h4>
+                      <p class="text-sm text-gray-600 mt-1">建议在账号简介中突出"学生党"标签，例如：<span class="bg-white px-1 py-0.5 rounded border border-gray-200 text-sm">大二学生｜月生活费1500的美妆省钱秘籍</span>，增强目标用户的认同感。</p>
+                    </div>
+                    
+                    <button class="mt-2 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-sm font-medium flex items-center hover:bg-primary/20 transition-colors" onclick="saveAsReference('账号定位分析')">
+                      <i class="fa-solid fa-bookmark mr-1"></i> 保存为参考
+                    </button>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-1">10:25</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 用户消息2 -->
+            <div class="animate-fade-in">
+              <div class="flex items-start justify-end space-x-3">
+                <div class="max-w-[90%]">
+                  <div class="bg-primary text-white rounded-lg rounded-tr-none p-4">
+                    <p>请帮我分析3个美妆类头部竞品账号，看看他们的内容和运营策略</p>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-1 flex justify-end">10:27</div>
+                </div>
+                <div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                  <img src="https://picsum.photos/id/1005/200/200" alt="用户头像" class="w-full h-full object-cover">
+                </div>
+              </div>
+            </div>
+            
+            <!-- AI回复2 - 竞品分析 -->
+            <div class="animate-fade-in">
+              <div class="flex items-start space-x-3">
+                <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                  <i class="fa-solid fa-robot text-white"></i>
+                </div>
+                <div class="max-w-[90%]">
+                  <div class="bg-white rounded-lg rounded-tl-none shadow-card p-4">
+                    <h3 class="font-semibold text-lg mb-3">🔍 美妆类头部竞品账号分析</h3>
+                    
+                    <!-- 竞品1 -->
+                    <div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
+                      <div class="bg-gray-50 p-3 flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                          <img src="https://picsum.photos/id/64/200/200" alt="账号头像" class="w-10 h-10 rounded-full object-cover">
+                          <div>
+                            <h4 class="font-medium">美妆情报局</h4>
+                            <p class="text-xs text-gray-500">粉丝：328.5w | 美妆榜TOP5</p>
+                          </div>
+                        </div>
+                        <span class="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">头部账号</span>
+                      </div>
+                      
+                      <div class="p-3">
+                        <h5 class="font-medium text-sm mb-2">内容特点</h5>
+                        <ul class="text-sm text-gray-600 space-y-1 mb-3">
+                          <li>• 主打产品测评，每周固定更新「新品红黑榜」系列</li>
+                          <li>• 封面统一采用「对比图+红色大字报」风格，点击率高达12.7%</li>
+                          <li>• 内容结构：痛点引入（80%用户踩过的坑）+ 产品实测 + 数据对比</li>
+                        </ul>
+                        
+                        <h5 class="font-medium text-sm mb-2">运营策略</h5>
+                        <ul class="text-sm text-gray-600 space-y-1 mb-3">
+                          <li>• 每周三、六固定更新，培养用户期待感</li>
+                          <li>• 评论区置顶「点击主页群聊，领取内部优惠券」，引导私域</li>
+                          <li>• 与20+中小品牌合作，采用「产品置换+少量佣金」模式</li>
+                        </ul>
+                        
+                        <div class="grid grid-cols-3 gap-2 mb-3">
+                          <img src="https://picsum.photos/id/237/300/400" alt="笔记示例" class="w-full h-24 object-cover rounded-lg">
+                          <img src="https://picsum.photos/id/238/300/400" alt="笔记示例" class="w-full h-24 object-cover rounded-lg">
+                          <img src="https://picsum.photos/id/239/300/400" alt="笔记示例" class="w-full h-24 object-cover rounded-lg">
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                          <span class="text-xs text-gray-400">最近30天数据：平均点赞8.5w | 收藏6.2w | 评论1.3w</span>
+                          <button class="px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium hover:bg-primary/20 transition-colors" onclick="referenceEntity('美妆情报局')">
+                            @美妆情报局
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- 竞品2 -->
+                    <div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
+                      <div class="bg-gray-50 p-3 flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                          <img src="https://picsum.photos/id/65/200/200" alt="账号头像" class="w-10 h-10 rounded-full object-cover">
+                          <div>
+                            <h4 class="font-medium">化妆师Lily</h4>
+                            <p class="text-xs text-gray-500">粉丝：215.3w | 美妆教程榜TOP3</p>
+                          </div>
+                        </div>
+                        <span class="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">头部账号</span>
+                      </div>
+                      
+                      <div class="p-3">
+                        <h5 class="font-medium text-sm mb-2">内容特点</h5>
+                        <ul class="text-sm text-gray-600 space-y-1 mb-3">
+                          <li>• 专注新手化妆教程，细分赛道「3分钟速成妆」系列</li>
+                          <li>• 视频采用「画中画」形式，同时展示整体妆效和局部细节</li>
+                          <li>• 强调「不挑肤质」「适合新手」，弱化产品品牌</li>
+                        </ul>
+                        
+                        <h5 class="font-medium text-sm mb-2">运营策略</h5>
+                        <ul class="text-sm text-gray-600 space-y-1 mb-3">
+                          <li>• 每天早7点准时更新，覆盖通勤用户</li>
+                          <li>• 发起「#我的化妆进步史」挑战赛，UGC内容占比30%</li>
+                          <li>• 推出付费课程「21天从小白到化妆师」，转化率5.2%</li>
+                        </ul>
+                        
+                        <div class="grid grid-cols-3 gap-2 mb-3">
+                          <img src="https://picsum.photos/id/240/300/400" alt="笔记示例" class="w-full h-24 object-cover rounded-lg">
+                          <img src="https://picsum.photos/id/241/300/400" alt="笔记示例" class="w-full h-24 object-cover rounded-lg">
+                          <img src="https://picsum.photos/id/242/300/400" alt="笔记示例" class="w-full h-24 object-cover rounded-lg">
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                          <span class="text-xs text-gray-400">最近30天数据：平均点赞6.8w | 收藏4.5w | 评论9800</span>
+                          <button class="px-2 py-1 bg-primary/10 text-primary rounded text-xs font-medium hover:bg-primary/20 transition-colors" onclick="referenceEntity('化妆师Lily')">
+                            @化妆师Lily
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="p-3 bg-primary/5 border border-primary/20 rounded-lg mb-4">
+                      <h4 class="font-medium text-primary flex items-center">
+                        <i class="fa-solid fa-chart-line mr-2"></i>
+                        竞争分析总结
+                      </h4>
+                      <p class="text-sm text-gray-600 mt-1">• 头部账号已占据主流赛道，建议选择「平价学生党」细分领域差异化竞争</p>
+                      <p class="text-sm text-gray-600 mt-1">• 视频内容互动率（15.3%）高于图文（9.7%），建议优先布局短视频</p>
+                      <p class="text-sm text-gray-600 mt-1">• 评论区运营重要性：高赞评论平均可带来12-18%额外曝光</p>
+                    </div>
+                    
+                    <button class="mt-2 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-sm font-medium flex items-center hover:bg-primary/20 transition-colors" onclick="saveAsReference('美妆竞品分析')">
+                      <i class="fa-solid fa-bookmark mr-1"></i> 保存为参考
+                    </button>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-1">10:32</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 用户消息3 -->
+            <div class="animate-fade-in">
+              <div class="flex items-start justify-end space-x-3">
+                <div class="max-w-[90%]">
+                  <div class="bg-primary text-white rounded-lg rounded-tr-none p-4">
+                    <p>结合@账号定位分析和@美妆情报局的运营策略，帮我生成5条适合油皮的内容选题，要突出平价和新手友好</p>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-1 flex justify-end">10:35</div>
+                </div>
+                <div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                  <img src="https://picsum.photos/id/1005/200/200" alt="用户头像" class="w-full h-full object-cover">
+                </div>
+              </div>
+            </div>
+            
+            <!-- AI回复3 - 内容选题生成 -->
+            <div class="animate-fade-in">
+              <div class="flex items-start space-x-3">
+                <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                  <i class="fa-solid fa-robot text-white"></i>
+                </div>
+                <div class="max-w-[90%]">
+                  <div class="bg-white rounded-lg rounded-tl-none shadow-card p-4">
+                    <h3 class="font-semibold text-lg mb-3">🎯 油皮平价内容选题推荐</h3>
+                    
+                    <div class="space-y-4 mb-4">
+                      <!-- 选题1 -->
+                      <div class="p-3 bg-gray-50 rounded-lg border-l-4 border-success">
+                        <div class="flex justify-between items-start mb-2">
+                          <h4 class="font-medium">🔥 月销10w+的油皮亲妈散粉！学生党必入5款不踩雷</h4>
+                          <span class="px-2 py-0.5 bg-success/10 text-success text-xs rounded-full">高转化</span>
+                        </div>
+                        <p class="text-sm text-gray-600">内容结构：痛点引入（油皮定妆3大误区）+ 5款平价散粉实测（价格10-80元）+ 油皮四季定妆技巧</p>
+                        <div class="mt-2 flex justify-between items-center">
+                          <div class="text-xs text-gray-400">预估互动率：12-15%</div>
+                          <button class="text-primary text-xs font-medium hover:underline">生成正文</button>
+                        </div>
+                      </div>
+                      
+                      <!-- 选题2 -->
+                      <div class="p-3 bg-gray-50 rounded-lg border-l-4 border-warning">
+                        <div class="flex justify-between items-start mb-2">
+                          <h4 class="font-medium">💡 宿舍党5分钟油皮伪素颜！不用散粉也能控油8小时</h4>
+                          <span class="px-2 py-0.5 bg-warning/10 text-warning text-xs rounded-full">教程类</span>
+                        </div>
+                        <p class="text-sm text-gray-600">内容结构：3步快速底妆（水乳选择+上妆手法）+ 控油小技巧（纸巾按压/散粉替代）+ 瑕疵遮盖重点</p>
+                        <div class="mt-2 flex justify-between items-center">
+                          <div class="text-xs text-gray-400">预估互动率：15-18%</div>
+                          <button class="text-primary text-xs font-medium hover:underline">生成正文</button>
+                        </div>
+                      </div>
+                      
+                      <!-- 选题3 -->
+                      <div class="p-3 bg-gray-50 rounded-lg border-l-4 border-primary">
+                        <div class="flex justify-between items-start mb-2">
+                          <h4 class="font-medium">🌟 油皮夏日救命神器！这几款平价水乳我回购了8次</h4>
+                          <span class="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">合集类</span>
+                        </div>
+                        <p class="text-sm text-gray-600">内容结构：油皮夏季护肤重点（清洁/控油/修复）+ 8款平价水乳推荐（含成分分析）+ 学生党优惠购买渠道</p>
+                        <div class="mt-2 flex justify-between items-center">
+                          <div class="text-xs text-gray-400">预估互动率：10-13%</div>
+                          <button class="text-primary text-xs font-medium hover:underline">生成正文</button>
+                        </div>
+                      </div>
+                      
+                      <!-- 选题4 -->
+                      <div class="p-3 bg-gray-50 rounded-lg border-l-4 border-secondary">
+                        <div class="flex justify-between items-start mb-2">
+                          <h4 class="font-medium">💰 百元内油皮粉底液测评！这3款比大牌还能打</h4>
+                          <span class="px-2 py-0.5 bg-secondary/10 text-secondary text-xs rounded-full">测评类</span>
+                        </div>
+                        <p class="text-sm text-gray-600">内容结构：油皮选粉底液3大标准+ 3款百元内粉底液实测（遮瑕/持久/氧化测试）+ 不同价位对比</p>
+                        <div class="mt-2 flex justify-between items-center">
+                          <div class="text-xs text-gray-400">预估互动率：13-16%</div>
+                          <button class="text-primary text-xs font-medium hover:underline">生成正文</button>
+                        </div>
+                      </div>
+                      
+                      <!-- 选题5 -->
+                      <div class="p-3 bg-gray-50 rounded-lg border-l-4 border-danger">
+                        <div class="flex justify-between items-start mb-2">
+                          <h4 class="font-medium">🚫 油皮避坑指南！这些网红产品用了烂脸别怪我没提醒</h4>
+                          <span class="px-2 py-0.5 bg-danger/10 text-danger text-xs rounded-full">避雷类</span>
+                        </div>
+                        <p class="text-sm text-gray-600">内容结构：油皮常见误区（过度清洁/酒精产品）+ 10款网红产品真实测评（含成分解析）+ 替代方案</p>
+                        <div class="mt-2 flex justify-between items-center">
+                          <div class="text-xs text-gray-400">预估互动率：14-17%</div>
+                          <button class="text-primary text-xs font-medium hover:underline">生成正文</button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                      <h4 class="font-medium text-primary flex items-center">
+                        <i class="fa-solid fa-lightbulb mr-2"></i>
+                        运营建议
+                      </h4>
+                      <p class="text-sm text-gray-600 mt-1">1. 封面统一使用「油皮痛点+产品特写+价格标签」风格，参考@美妆情报局点击率提升技巧</p>
+                      <p class="text-sm text-gray-600 mt-1">2. 每条内容加入「学生党专属优惠」信息（如「关注私信领取5元无门槛券」）</p>
+                      <p class="text-sm text-gray-600 mt-1">3. 发布时间选择周二/周四晚8点（学生活跃高峰）和周末中午12点</p>
+                    </div>
+                    
+                    <button class="mt-2 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-sm font-medium flex items-center hover:bg-primary/20 transition-colors" onclick="saveAsReference('油皮内容选题')">
+                      <i class="fa-solid fa-bookmark mr-1"></i> 保存为参考
+                    </button>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-1">10:40</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 参考实体面板 -->
+            <div class="animate-fade-in" id="referencePanel" style="display: none;">
+              <div class="flex items-start space-x-3">
+                <div class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0">
+                  <i class="fa-solid fa-file-text text-gray-600"></i>
+                </div>
+                <div class="max-w-[90%]">
+                  <div class="bg-gray-50 rounded-lg rounded-tl-none border border-gray-200 p-4">
+                    <div class="flex justify-between items-center mb-3">
+                      <h3 class="font-medium text-gray-700" id="referenceTitle">参考资料</h3>
+                      <button class="text-gray-400 hover:text-gray-600" onclick="document.getElementById('referencePanel').style.display = 'none'">
+                        <i class="fa-solid fa-times"></i>
+                      </button>
+                    </div>
+                    <div class="text-sm text-gray-600 space-y-2" id="referenceContent">
+                      <!-- 参考内容将通过JS动态填充 -->
+                    </div>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-1">参考资料</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 底部输入区域 -->
+          <div class="p-4 border-t border-gray-200 bg-white">
+            <div class="flex items-end space-x-3">
+              <!-- 引用按钮 -->
+              <div class="relative">
+                <button class="p-2.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors" id="referenceBtn">
+                  <i class="fa-solid fa-at"></i>
+                </button>
+                <!-- 引用下拉菜单 -->
+                <div class="absolute bottom-full left-0 mb-2 w-56 bg-white rounded-lg shadow-card p-2 hidden" id="referenceMenu">
+                  <div class="text-xs text-gray-400 px-2 mb-1">已保存的参考</div>
+                  <button class="w-full px-2 py-1.5 rounded text-left text-sm text-gray-600 hover:bg-gray-100" onclick="insertReference('@账号定位分析')">
+                    @账号定位分析
+                  </button>
+                  <button class="w-full px-2 py-1.5 rounded text-left text-sm text-gray-600 hover:bg-gray-100" onclick="insertReference('@美妆情报局')">
+                    @美妆情报局
+                  </button>
+                  <button class="w-full px-2 py-1.5 rounded text-left text-sm text-gray-600 hover:bg-gray-100" onclick="insertReference('@化妆师Lily')">
+                    @化妆师Lily
+                  </button>
+                  <button class="w-full px-2 py-1.5 rounded text-left text-sm text-gray-600 hover:bg-gray-100" onclick="insertReference('@油皮内容选题')">
+                    @油皮内容选题
+                  </button>
+                </div>
+              </div>
+              
+              <!-- 输入框 -->
+              <div class="flex-1">
+                <textarea id="messageInput" rows="3" placeholder="输入问题或指令..." 
+                         class="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none transition-all"></textarea>
+                <div class="flex justify-between items-center mt-2">
+                  <div class="flex items-center space-x-2">
+                    <button class="p-1.5 rounded hover:bg-gray-100 text-gray-500 transition-colors">
+                      <i class="fa-solid fa-image"></i>
+                    </button>
+                    <button class="p-1.5 rounded hover:bg-gray-100 text-gray-500 transition-colors">
+                      <i class="fa-solid fa-paperclip"></i>
+                    </button>
+                    <button class="p-1.5 rounded hover:bg-gray-100 text-gray-500 transition-colors">
+                      <i class="fa-solid fa-smile"></i>
+                    </button>
+                  </div>
+                  <button id="sendBtn" class="px-4 py-2 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors flex items-center">
+                    <span>发送</span>
+                    <i class="fa-solid fa-paper-plane ml-2"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 任务中心页面 -->
+        <div id="taskPage" class="h-full flex flex-col hidden">
+          <div class="bg-white shadow-sm px-4 py-3">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold">任务中心</h2>
+              <button class="px-3 py-1.5 bg-primary text-white rounded-lg text-sm hover:bg-primary/90 transition-colors">
+                <i class="fa-solid fa-plus mr-1"></i>创建任务
+              </button>
+            </div>
+          </div>
+
+          <div class="flex-1 p-4 space-y-4">
+            <!-- 任务统计 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm text-gray-500">待处理任务</p>
+                    <p class="text-2xl font-semibold text-primary mt-1">12</p>
+                  </div>
+                  <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <i class="fa-solid fa-clipboard-list text-primary"></i>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm text-gray-500">进行中</p>
+                    <p class="text-2xl font-semibold text-warning mt-1">5</p>
+                  </div>
+                  <div class="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center">
+                    <i class="fa-solid fa-spinner text-warning"></i>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm text-gray-500">已完成</p>
+                    <p class="text-2xl font-semibold text-success mt-1">28</p>
+                  </div>
+                  <div class="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
+                    <i class="fa-solid fa-check text-success"></i>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm text-gray-500">已逾期</p>
+                    <p class="text-2xl font-semibold text-danger mt-1">2</p>
+                  </div>
+                  <div class="w-10 h-10 rounded-lg bg-danger/10 flex items-center justify-center">
+                    <i class="fa-solid fa-exclamation text-danger"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 任务列表 -->
+            <div class="bg-white rounded-lg shadow-sm">
+              <div class="p-4 border-b border-gray-100">
+                <div class="flex items-center justify-between">
+                  <h3 class="font-medium">任务列表</h3>
+                  <div class="flex items-center space-x-2">
+                    <select class="px-3 py-1.5 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary">
+                      <option>全部状态</option>
+                      <option>待处理</option>
+                      <option>进行中</option>
+                      <option>已完成</option>
+                      <option>已逾期</option>
+                    </select>
+                    <select class="px-3 py-1.5 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary">
+                      <option>全部类型</option>
+                      <option>内容创作</option>
+                      <option>账号运营</option>
+                      <option>数据分析</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="divide-y divide-gray-100">
+                <!-- 任务项 -->
+                <div class="p-4 hover:bg-gray-50 transition-colors">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                      <input type="checkbox" class="rounded text-primary focus:ring-primary">
+                      <span class="px-2 py-1 bg-warning/10 text-warning text-xs rounded">进行中</span>
+                      <h4 class="font-medium">创建油皮护肤测评内容</h4>
+                    </div>
+                    <div class="flex items-center space-x-4 text-sm text-gray-500">
+                      <span>截止时间：2024-03-20</span>
+                      <span>负责人：张运营</span>
+                      <button class="text-primary hover:underline">详情</button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="p-4 hover:bg-gray-50 transition-colors">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                      <input type="checkbox" class="rounded text-primary focus:ring-primary">
+                      <span class="px-2 py-1 bg-primary/10 text-primary text-xs rounded">待处理</span>
+                      <h4 class="font-medium">竞品账号数据分析</h4>
+                    </div>
+                    <div class="flex items-center space-x-4 text-sm text-gray-500">
+                      <span>截止时间：2024-03-22</span>
+                      <span>负责人：李分析</span>
+                      <button class="text-primary hover:underline">详情</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 数据分析页面 -->
+        <div id="analyticsPage" class="h-full flex flex-col hidden">
+          <div class="bg-white shadow-sm px-4 py-3">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold">数据分析</h2>
+              <div class="flex items-center space-x-2">
+                <select class="px-3 py-1.5 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary">
+                  <option>最近7天</option>
+                  <option>最近30天</option>
+                  <option>最近90天</option>
+                  <option>自定义</option>
+                </select>
+                <button class="px-3 py-1.5 bg-primary text-white rounded-lg text-sm hover:bg-primary/90 transition-colors">
+                  <i class="fa-solid fa-download mr-1"></i>导出报告
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex-1 p-4 space-y-4">
+            <!-- 数据概览 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm text-gray-500">总粉丝数</p>
+                    <p class="text-2xl font-semibold text-primary mt-1">23.5w</p>
+                    <p class="text-xs text-success mt-1">
+                      <i class="fa-solid fa-arrow-up mr-1"></i>+12.5%
+                    </p>
+                  </div>
+                  <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <i class="fa-solid fa-users text-primary"></i>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm text-gray-500">笔记数</p>
+                    <p class="text-2xl font-semibold text-warning mt-1">428</p>
+                    <p class="text-xs text-success mt-1">
+                      <i class="fa-solid fa-arrow-up mr-1"></i>+8.3%
+                    </p>
+                  </div>
+                  <div class="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center">
+                    <i class="fa-solid fa-file-lines text-warning"></i>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm text-gray-500">平均互动率</p>
+                    <p class="text-2xl font-semibold text-success mt-1">5.2%</p>
+                    <p class="text-xs text-danger mt-1">
+                      <i class="fa-solid fa-arrow-down mr-1"></i>-0.8%
+                    </p>
+                  </div>
+                  <div class="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
+                    <i class="fa-solid fa-comments text-success"></i>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm text-gray-500">商品转化率</p>
+                    <p class="text-2xl font-semibold text-primary mt-1">3.8%</p>
+                    <p class="text-xs text-success mt-1">
+                      <i class="fa-solid fa-arrow-up mr-1"></i>+1.2%
+                    </p>
+                  </div>
+                  <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <i class="fa-solid fa-shopping-cart text-primary"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 图表区域 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="bg-white rounded-lg shadow-sm p-4">
+                <h3 class="font-medium mb-4">粉丝增长趋势</h3>
+                <div class="h-64 bg-gray-50 rounded flex items-center justify-center">
+                  <!-- 这里放置实际的图表组件 -->
+                  <p class="text-gray-400">粉丝增长趋势图表</p>
+                </div>
+              </div>
+              <div class="bg-white rounded-lg shadow-sm p-4">
+                <h3 class="font-medium mb-4">内容数据分析</h3>
+                <div class="h-64 bg-gray-50 rounded flex items-center justify-center">
+                  <!-- 这里放置实际的图表组件 -->
+                  <p class="text-gray-400">内容数据分析图表</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 竞品分析页面 -->
+        <div id="competitorPage" class="h-full flex flex-col hidden">
+          <div class="bg-white shadow-sm px-4 py-3">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold">竞品分析</h2>
+              <div class="flex items-center space-x-2">
+                <button class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200 transition-colors">
+                  <i class="fa-solid fa-filter mr-1"></i>筛选
+                </button>
+                <button class="px-3 py-1.5 bg-primary text-white rounded-lg text-sm hover:bg-primary/90 transition-colors">
+                  <i class="fa-solid fa-plus mr-1"></i>添加竞品
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex-1 p-4 space-y-4">
+            <!-- 竞品概览卡片 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm text-gray-500">监控账号数</p>
+                    <p class="text-2xl font-semibold text-primary mt-1">24</p>
+                  </div>
+                  <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <i class="fa-solid fa-user-group text-primary"></i>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm text-gray-500">本月爆款数</p>
+                    <p class="text-2xl font-semibold text-warning mt-1">156</p>
+                  </div>
+                  <div class="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center">
+                    <i class="fa-solid fa-fire text-warning"></i>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm text-gray-500">平均爆款率</p>
+                    <p class="text-2xl font-semibold text-success mt-1">8.2%</p>
+                  </div>
+                  <div class="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
+                    <i class="fa-solid fa-chart-line text-success"></i>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-4 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm text-gray-500">知识库文档</p>
+                    <p class="text-2xl font-semibold text-primary mt-1">89</p>
+                  </div>
+                  <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <i class="fa-solid fa-book text-primary"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 竞品账号列表 -->
+            <div class="bg-white rounded-lg shadow-sm">
+              <div class="p-4 border-b border-gray-100">
+                <div class="flex items-center justify-between">
+                  <h3 class="font-medium">竞品账号库</h3>
+                  <div class="flex items-center space-x-2">
+                    <select class="px-3 py-1.5 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary">
+                      <option>全部分类</option>
+                      <option>美妆测评</option>
+                      <option>护肤科普</option>
+                      <option>妆容教程</option>
+                    </select>
+                    <select class="px-3 py-1.5 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary">
+                      <option>粉丝量排序</option>
+                      <option>更新时间</option>
+                      <option>爆款率</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="divide-y divide-gray-100">
+                <!-- 竞品账号1 -->
+                <div class="p-4 hover:bg-gray-50">
+                  <div class="flex items-start space-x-4">
+                    <img src="https://picsum.photos/id/64/200/200" alt="账号头像" class="w-16 h-16 rounded-lg object-cover">
+                    <div class="flex-1">
+                      <div class="flex items-center justify-between">
+                        <div>
+                          <h4 class="font-medium flex items-center">
+                            美妆情报局
+                            <span class="ml-2 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">头部账号</span>
+                          </h4>
+                          <p class="text-sm text-gray-500 mt-1">ID: xhs88661123</p>
+                        </div>
+                        <button class="px-3 py-1.5 border border-gray-200 rounded text-sm hover:bg-gray-50">查看分析</button>
+                      </div>
+                      <div class="grid grid-cols-4 gap-4 mt-3">
+                        <div class="text-center">
+                          <div class="text-sm font-medium">328.5w</div>
+                          <div class="text-xs text-gray-500">粉丝量</div>
+                        </div>
+                        <div class="text-center">
+                          <div class="text-sm font-medium">12.7%</div>
+                          <div class="text-xs text-gray-500">爆款率</div>
+                        </div>
+                        <div class="text-center">
+                          <div class="text-sm font-medium">2024-03-19</div>
+                          <div class="text-xs text-gray-500">最近更新</div>
+                        </div>
+                        <div class="text-center">
+                          <div class="text-sm font-medium">42</div>
+                          <div class="text-xs text-gray-500">分析记录</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 竞品账号2 -->
+                <div class="p-4 hover:bg-gray-50">
+                  <div class="flex items-start space-x-4">
+                    <img src="https://picsum.photos/id/65/200/200" alt="账号头像" class="w-16 h-16 rounded-lg object-cover">
+                    <div class="flex-1">
+                      <div class="flex items-center justify-between">
+                        <div>
+                          <h4 class="font-medium flex items-center">
+                            化妆师Lily
+                            <span class="ml-2 px-2 py-0.5 bg-warning/10 text-warning text-xs rounded-full">腰部账号</span>
+                          </h4>
+                          <p class="text-sm text-gray-500 mt-1">ID: xhs77552211</p>
+                        </div>
+                        <button class="px-3 py-1.5 border border-gray-200 rounded text-sm hover:bg-gray-50">查看分析</button>
+                      </div>
+                      <div class="grid grid-cols-4 gap-4 mt-3">
+                        <div class="text-center">
+                          <div class="text-sm font-medium">215.3w</div>
+                          <div class="text-xs text-gray-500">粉丝量</div>
+                        </div>
+                        <div class="text-center">
+                          <div class="text-sm font-medium">8.5%</div>
+                          <div class="text-xs text-gray-500">爆款率</div>
+                        </div>
+                        <div class="text-center">
+                          <div class="text-sm font-medium">2024-03-18</div>
+                          <div class="text-xs text-gray-500">最近更新</div>
+                        </div>
+                        <div class="text-center">
+                          <div class="text-sm font-medium">35</div>
+                          <div class="text-xs text-gray-500">分析记录</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 竞品知识库 -->
+            <div class="bg-white rounded-lg shadow-sm">
+              <div class="p-4 border-b border-gray-100">
+                <div class="flex items-center justify-between">
+                  <h3 class="font-medium">竞品知识库</h3>
+                  <div class="flex items-center space-x-2">
+                    <select class="px-3 py-1.5 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary">
+                      <option>全部类型</option>
+                      <option>爆款要素</option>
+                      <option>账号分析</option>
+                      <option>标签组合</option>
+                    </select>
+                    <button class="px-3 py-1.5 bg-primary text-white rounded text-sm hover:bg-primary/90">
+                      <i class="fa-solid fa-plus mr-1"></i>新建文档
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="divide-y divide-gray-100">
+                <!-- 知识库文档1 -->
+                <div class="p-4 hover:bg-gray-50">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <div class="flex items-center space-x-2">
+                        <span class="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">爆款要素</span>
+                        <h4 class="font-medium">美妆情报局爆款标题模板分析</h4>
+                      </div>
+                      <div class="mt-2 text-sm text-gray-600">
+                        <p class="line-clamp-2">标题模板：「${价格}元平替${大牌产品}」「${使用场景}必备，${效果}的${产品类型}」，核心关键词：平价、替代、效果...</p>
+                      </div>
+                      <div class="mt-2 flex items-center text-xs text-gray-400 space-x-4">
+                        <span>更新时间：2024-03-19</span>
+                        <span>分析账号：美妆情报局</span>
+                        <span>高频词Top3：平价、测评、效果</span>
+                      </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                      <button class="p-1.5 text-gray-400 hover:text-primary">
+                        <i class="fa-solid fa-edit"></i>
+                      </button>
+                      <button class="p-1.5 text-gray-400 hover:text-primary">
+                        <i class="fa-solid fa-share"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 知识库文档2 -->
+                <div class="p-4 hover:bg-gray-50">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <div class="flex items-center space-x-2">
+                        <span class="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">账号拆解</span>
+                        <h4 class="font-medium">美妆情报局账号运营策略拆解</h4>
+                      </div>
+                      <div class="mt-2 text-sm text-gray-600">
+                        <p class="line-clamp-2">账号定位：美妆测评KOL，目标人群95%为18-35岁女性。运营策略：每周固定更新节奏，测评类占比78%，种草类占比22%。</p>
+                      </div>
+                      <div class="mt-2 flex items-center text-xs text-gray-400 space-x-4">
+                        <span>更新时间：2024-03-19</span>
+                        <span>分析维度：8个</span>
+                        <span>参考价值：极高</span>
+                      </div>
+                      <!-- 拆解维度预览 -->
+                      <div class="mt-2 flex flex-wrap gap-2">
+                        <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">定位分析</span>
+                        <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">人设打造</span>
+                        <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">内容策略</span>
+                        <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">变现方式</span>
+                        <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">粉丝运营</span>
+                      </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                      <button class="px-3 py-1.5 text-sm text-primary border border-primary rounded hover:bg-primary/5">
+                        查看完整拆解
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 知识库文档3 -->
+                <div class="p-4 hover:bg-gray-50">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <div class="flex items-center space-x-2">
+                        <span class="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">账号拆解</span>
+                        <h4 class="font-medium">化妆师Lily账号商业价值分析</h4>
+                      </div>
+                      <div class="mt-2 text-sm text-gray-600">
+                        <p class="line-clamp-2">变现方式分析：课程收入45%，广告变现35%，商品佣金20%。粉丝画像：25-35岁职场女性为主，消费能力中等偏上。</p>
+                      </div>
+                      <div class="mt-2 flex items-center text-xs text-gray-400 space-x-4">
+                        <span>更新时间：2024-03-18</span>
+                        <span>分析维度：6个</span>
+                        <span>商业价值：高</span>
+                      </div>
+                      <!-- 拆解维度预览 -->
+                      <div class="mt-2 flex flex-wrap gap-2">
+                        <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">商业模式</span>
+                        <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">变现渠道</span>
+                        <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">粉丝画像</span>
+                        <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">品牌合作</span>
+                      </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                      <button class="px-3 py-1.5 text-sm text-primary border border-primary rounded hover:bg-primary/5">
+                        查看完整拆解
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 内容库页面 -->
+        <div id="contentPage" class="h-full flex flex-col hidden">
+          <div class="bg-white shadow-sm px-4 py-3">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold">内容库</h2>
+              <div class="flex items-center space-x-2">
+                <button class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200 transition-colors">
+                  <i class="fa-solid fa-filter mr-1"></i>筛选
+                </button>
+                <button class="px-3 py-1.5 bg-primary text-white rounded-lg text-sm hover:bg-primary/90 transition-colors">
+                  <i class="fa-solid fa-plus mr-1"></i>创建内容
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex-1 p-4">
+            <!-- 内容卡片网格 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <!-- 内容卡片 -->
+              <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                <img src="https://picsum.photos/id/64/400/300" alt="内容封面" class="w-full h-48 object-cover">
+                <div class="p-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="px-2 py-1 bg-success/10 text-success text-xs rounded">已发布</span>
+                    <span class="text-xs text-gray-500">2024-03-15</span>
+                  </div>
+                  <h4 class="font-medium mb-2">油皮必备！平价好用的控油散粉测评</h4>
+                  <p class="text-sm text-gray-500 mb-3 line-clamp-2">测评了5款百元以内的控油散粉，从定妆效果、持久度、性价比等多个维度进行对比...</p>
+                  <div class="flex items-center justify-between text-sm">
+                    <div class="flex items-center space-x-3 text-gray-500">
+                      <span><i class="fa-solid fa-heart mr-1"></i>2.3k</span>
+                      <span><i class="fa-solid fa-comment mr-1"></i>158</span>
+                      <span><i class="fa-solid fa-bookmark mr-1"></i>426</span>
+                    </div>
+                    <button class="text-primary hover:underline">查看详情</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 更多内容卡片 -->
+              <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                <img src="https://picsum.photos/id/65/400/300" alt="内容封面" class="w-full h-48 object-cover">
+                <div class="p-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="px-2 py-1 bg-warning/10 text-warning text-xs rounded">审核中</span>
+                    <span class="text-xs text-gray-500">2024-03-14</span>
+                  </div>
+                  <h4 class="font-medium mb-2">新手化妆必看！手把手教你打造清透妆容</h4>
+                  <p class="text-sm text-gray-500 mb-3 line-clamp-2">从底妆、眼妆到唇妆，详细讲解每个步骤，新手也能轻松上手...</p>
+                  <div class="flex items-center justify-between text-sm">
+                    <div class="flex items-center space-x-3 text-gray-500">
+                      <span><i class="fa-solid fa-heart mr-1"></i>--</span>
+                      <span><i class="fa-solid fa-comment mr-1"></i>--</span>
+                      <span><i class="fa-solid fa-bookmark mr-1"></i>--</span>
+                    </div>
+                    <button class="text-primary hover:underline">查看详情</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 发布计划页面 -->
+        <div id="schedulePage" class="h-full flex flex-col hidden">
+          <div class="bg-white shadow-sm px-4 py-3">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold">发布计划</h2>
+              <button class="px-3 py-1.5 bg-primary text-white rounded-lg text-sm hover:bg-primary/90 transition-colors">
+                <i class="fa-solid fa-plus mr-1"></i>新建计划
+              </button>
+            </div>
+          </div>
+
+          <div class="flex-1 p-4">
+            <!-- 日历视图 -->
+            <div class="bg-white rounded-lg shadow-sm p-4 mb-4">
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-2">
+                  <button class="p-1.5 rounded hover:bg-gray-100">
+                    <i class="fa-solid fa-chevron-left"></i>
+                  </button>
+                  <h3 class="font-medium">2024年3月</h3>
+                  <button class="p-1.5 rounded hover:bg-gray-100">
+                    <i class="fa-solid fa-chevron-right"></i>
+                  </button>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <button class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded text-sm hover:bg-gray-200">月</button>
+                  <button class="px-3 py-1.5 bg-primary text-white rounded text-sm">周</button>
+                  <button class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded text-sm hover:bg-gray-200">日</button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-7 gap-4">
+                <!-- 日历头部 -->
+                <div class="text-center text-sm text-gray-500 font-medium">周一</div>
+                <div class="text-center text-sm text-gray-500 font-medium">周二</div>
+                <div class="text-center text-sm text-gray-500 font-medium">周三</div>
+                <div class="text-center text-sm text-gray-500 font-medium">周四</div>
+                <div class="text-center text-sm text-gray-500 font-medium">周五</div>
+                <div class="text-center text-sm text-gray-500 font-medium">周六</div>
+                <div class="text-center text-sm text-gray-500 font-medium">周日</div>
+
+                <!-- 日历格子 -->
+                <div class="h-24 border border-gray-100 rounded p-2">
+                  <div class="text-sm text-gray-400">1</div>
+                </div>
+                <div class="h-24 border border-gray-100 rounded p-2">
+                  <div class="text-sm text-gray-400">2</div>
+                </div>
+                <div class="h-24 border border-gray-100 rounded p-2 relative">
+                  <div class="text-sm text-gray-400">3</div>
+                  <div class="absolute bottom-2 left-2 right-2">
+                    <div class="bg-primary/10 text-primary text-xs p-1 rounded truncate">
+                      护肤品测评
+                    </div>
+                  </div>
+                </div>
+                <!-- 更多日历格子 -->
+              </div>
+            </div>
+
+            <!-- 待发布列表 -->
+            <div class="bg-white rounded-lg shadow-sm">
+              <div class="p-4 border-b border-gray-100">
+                <h3 class="font-medium">待发布内容</h3>
+              </div>
+              <div class="divide-y divide-gray-100">
+                <div class="p-4 hover:bg-gray-50">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                      <img src="https://picsum.photos/id/64/100/100" alt="内容封面" class="w-12 h-12 rounded object-cover">
+                      <div>
+                        <h4 class="font-medium">平价好用的控油散粉测评</h4>
+                        <p class="text-sm text-gray-500">计划发布时间：2024-03-20 12:00</p>
+                      </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                      <button class="px-3 py-1.5 bg-primary text-white rounded text-sm">立即发布</button>
+                      <button class="px-3 py-1.5 border border-gray-200 rounded text-sm">编辑</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- 右侧信息面板 -->
+    <aside class="w-72 bg-white shadow-sm hidden lg:block transition-all duration-300" id="infoPanel">
+      <div class="h-full flex flex-col">
+        <!-- 账号信息 -->
+        <div class="flex-1 overflow-y-auto">
+          <div class="p-4 border-b border-gray-200">
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="font-semibold text-lg">账号管理</h3>
+              <button class="px-3 py-1 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 transition-colors">
+                <i class="fa-solid fa-plus mr-1"></i>添加账号
+              </button>
+            </div>
+          </div>
+
+          <!-- 账号列表 -->
+          <div class="divide-y divide-gray-100">
+            <!-- 账号1 -->
+            <div class="account-item">
+              <div class="p-4 hover:bg-gray-50 cursor-pointer flex items-center justify-between account-header" onclick="toggleAccount(this)">
+                <div class="flex items-center space-x-3">
+                  <img src="https://picsum.photos/id/64/200/200" alt="账号头像" class="w-10 h-10 rounded-full object-cover border-2 border-primary">
+                  <div>
+                    <h4 class="font-medium">学生党美妆日记</h4>
+                    <p class="text-xs text-gray-500">小红书账号</p>
+                  </div>
+                </div>
+                <i class="fa-solid fa-chevron-down text-gray-400 transition-transform"></i>
+              </div>
+              
+              <div class="account-content hidden px-4 pb-4">
+                <div class="space-y-4">
+                  <!-- 基础信息 -->
+                  <div class="bg-gray-50 rounded-lg p-3">
+                    <h5 class="font-medium text-sm mb-2 flex items-center">
+                      <i class="fa-solid fa-circle-info mr-2 text-primary"></i>基础信息
+                    </h5>
+                    <div class="space-y-2">
+                      <div class="flex items-center justify-between text-sm">
+                        <span class="text-gray-500">账号ID</span>
+                        <span class="font-medium">xhs88661123</span>
+                      </div>
+                      <div class="flex items-center justify-between text-sm">
+                        <span class="text-gray-500">创建时间</span>
+                        <span class="font-medium">2024-03-15</span>
+                      </div>
+                      <div class="flex items-center justify-between text-sm">
+                        <span class="text-gray-500">账号状态</span>
+                        <span class="px-2 py-0.5 bg-success/10 text-success text-xs rounded-full">正常运营</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 用户画像 -->
+                  <div class="bg-gray-50 rounded-lg p-3">
+                    <h5 class="font-medium text-sm mb-2 flex items-center">
+                      <i class="fa-solid fa-user-tag mr-2 text-primary"></i>用户画像
+                    </h5>
+                    <div class="space-y-2">
+                      <div>
+                        <label class="block text-xs text-gray-500 mb-1">目标人群</label>
+                        <select class="w-full px-2 py-1.5 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary">
+                          <option>18-25岁学生党</option>
+                          <option>25-30岁职场新人</option>
+                          <option>30-35岁宝妈</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-500 mb-1">消费能力</label>
+                        <select class="w-full px-2 py-1.5 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary">
+                          <option>100-300元</option>
+                          <option>300-500元</option>
+                          <option>500-1000元</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-500 mb-1">兴趣偏好</label>
+                        <div class="flex flex-wrap gap-1">
+                          <span class="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">平价美妆</span>
+                          <span class="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">护肤</span>
+                          <span class="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">化妆教程</span>
+                          <button class="px-2 py-0.5 border border-dashed border-gray-300 text-gray-400 text-xs rounded-full hover:border-primary hover:text-primary">
+                            <i class="fa-solid fa-plus text-xs"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 账号定位 -->
+                  <div class="bg-gray-50 rounded-lg p-3">
+                    <h5 class="font-medium text-sm mb-2 flex items-center">
+                      <i class="fa-solid fa-bullseye mr-2 text-primary"></i>账号定位
+                    </h5>
+                    <div class="space-y-2">
+                      <div>
+                        <label class="block text-xs text-gray-500 mb-1">账号风格</label>
+                        <div class="flex flex-wrap gap-1">
+                          <span class="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">清新</span>
+                          <span class="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">专业</span>
+                          <span class="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">亲和力</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-500 mb-1">内容方向</label>
+                        <div class="flex flex-wrap gap-1">
+                          <span class="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">测评</span>
+                          <span class="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">教程</span>
+                          <span class="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">种草</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-500 mb-1">差异化优势</label>
+                        <textarea class="w-full px-2 py-1.5 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary" rows="2">专注学生党平价美妆，每月消费不超过300元，新手友好的化妆教程</textarea>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 账号简介 -->
+                  <div class="bg-gray-50 rounded-lg p-3">
+                    <h5 class="font-medium text-sm mb-2 flex items-center">
+                      <i class="fa-solid fa-file-lines mr-2 text-primary"></i>账号简介
+                    </h5>
+                    <textarea class="w-full px-2 py-1.5 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary" rows="3">大二学生｜月生活费1500的美妆省钱秘籍｜每天分享平价好物和新手化妆教程｜关注我，一起变美不踩坑！</textarea>
+                    <div class="flex items-center justify-between mt-2">
+                      <span class="text-xs text-gray-400">建议长度：60-100字</span>
+                      <button class="text-xs text-primary hover:underline">生成简介</button>
+                    </div>
+                  </div>
+
+                  <!-- 运营数据 -->
+                  <div class="bg-gray-50 rounded-lg p-3">
+                    <h5 class="font-medium text-sm mb-2 flex items-center">
+                      <i class="fa-solid fa-chart-line mr-2 text-primary"></i>运营数据
+                    </h5>
+                    <div class="grid grid-cols-3 gap-2">
+                      <div class="text-center p-2 bg-white rounded">
+                        <div class="text-lg font-semibold text-primary">2.3w</div>
+                        <div class="text-xs text-gray-500">粉丝数</div>
+                      </div>
+                      <div class="text-center p-2 bg-white rounded">
+                        <div class="text-lg font-semibold text-primary">42</div>
+                        <div class="text-xs text-gray-500">笔记数</div>
+                      </div>
+                      <div class="text-center p-2 bg-white rounded">
+                        <div class="text-lg font-semibold text-primary">5.2%</div>
+                        <div class="text-xs text-gray-500">互动率</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 账号2 -->
+              <div class="account-item">
+                <div class="p-4 hover:bg-gray-50 cursor-pointer flex items-center justify-between account-header" onclick="toggleAccount(this)">
+                  <div class="flex items-center space-x-3">
+                    <img src="https://picsum.photos/id/65/200/200" alt="账号头像" class="w-10 h-10 rounded-full object-cover border-2 border-gray-200">
+                    <div>
+                      <h4 class="font-medium">轻奢美妆分享</h4>
+                      <p class="text-xs text-gray-500">小红书账号</p>
+                    </div>
+                  </div>
+                  <i class="fa-solid fa-chevron-down text-gray-400 transition-transform"></i>
+                </div>
+                
+                <div class="account-content hidden px-4 pb-4">
+                  <!-- 与账号1相同的内容结构，但数据不同 -->
+                </div>
+              </div>
+
+              <!-- 账号3 -->
+              <div class="account-item">
+                <div class="p-4 hover:bg-gray-50 cursor-pointer flex items-center justify-between account-header" onclick="toggleAccount(this)">
+                  <div class="flex items-center space-x-3">
+                    <img src="https://picsum.photos/id/66/200/200" alt="账号头像" class="w-10 h-10 rounded-full object-cover border-2 border-gray-200">
+                    <div>
+                      <h4 class="font-medium">职场美妆笔记</h4>
+                      <p class="text-xs text-gray-500">小红书账号</p>
+                    </div>
+                  </div>
+                  <i class="fa-solid fa-chevron-down text-gray-400 transition-transform"></i>
+                </div>
+                
+                <div class="account-content hidden px-4 pb-4">
+                  <!-- 与账号1相同的内容结构，但数据不同 -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    // 侧边栏切换
+    document.getElementById('sidebarToggle').addEventListener('click', function() {
+      const sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('hidden');
+      sidebar.classList.toggle('absolute');
+      sidebar.classList.toggle('inset-y-0');
+      sidebar.classList.toggle('left-0');
+      sidebar.classList.toggle('z-40');
+    });
+    
+    // 引用下拉菜单
+    document.getElementById('referenceBtn').addEventListener('click', function() {
+      const menu = document.getElementById('referenceMenu');
+      menu.classList.toggle('hidden');
+    });
+    
+    // 点击其他区域关闭下拉菜单
+    document.addEventListener('click', function(event) {
+      const referenceBtn = document.getElementById('referenceBtn');
+      const referenceMenu = document.getElementById('referenceMenu');
+      
+      if (!referenceBtn.contains(event.target) && !referenceMenu.contains(event.target)) {
+        referenceMenu.classList.add('hidden');
+      }
+    });
+    
+    // 插入引用
+    function insertReference(text) {
+      const input = document.getElementById('messageInput');
+      input.value += text + ' ';
+      input.focus();
+      document.getElementById('referenceMenu').classList.add('hidden');
+    }
+    
+    // 保存为参考
+    function saveAsReference(title) {
+      alert(`已保存"${title}"到参考资料`);
+    }
+    
+    // 引用实体
+    function referenceEntity(entity) {
+      const panel = document.getElementById('referencePanel');
+      const title = document.getElementById('referenceTitle');
+      const content = document.getElementById('referenceContent');
+      
+      title.textContent = entity;
+      
+      // 根据不同实体设置内容
+      if (entity === '美妆情报局') {
+        content.innerHTML = `
+          <p>粉丝量：328.5w | 美妆榜TOP5</p>
+          <p class="mt-1">内容特点：主打产品测评，每周固定更新「新品红黑榜」系列，封面统一采用「对比图+红色大字报」风格，点击率高达12.7%。</p>
+          <p class="mt-1">运营策略：每周三、六固定更新，培养用户期待感；评论区置顶「点击主页群聊，领取内部优惠券」，引导私域；与20+中小品牌合作，采用「产品置换+少量佣金」模式。</p>
+        `;
+      } else if (entity === '化妆师Lily') {
+        content.innerHTML = `
+          <p>粉丝量：215.3w | 美妆教程榜TOP3</p>
+          <p class="mt-1">内容特点：专注新手化妆教程，细分赛道「3分钟速成妆」系列，视频采用「画中画」形式，同时展示整体妆效和局部细节，强调「不挑肤质」「适合新手」，弱化产品品牌。</p>
+          <p class="mt-1">运营策略：每天早7点准时更新，覆盖通勤用户；发起「#我的化妆进步史」挑战赛，UGC内容占比30%；推出付费课程「21天从小白到化妆师」，转化率5.2%。</p>
+        `;
+      }
+      
+      panel.style.display = 'block';
+      panel.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    // 发送消息
+    document.getElementById('sendBtn').addEventListener('click', function() {
+      const input = document.getElementById('messageInput');
+      const message = input.value.trim();
+      
+      if (message) {
+        // 添加用户消息到聊天区域
+        const chatContainer = document.getElementById('chatContainer');
+        const userMessageHTML = `
+          <div class="animate-fade-in">
+            <div class="flex items-start justify-end space-x-3">
+              <div class="max-w-[90%]">
+                <div class="bg-primary text-white rounded-lg rounded-tr-none p-4">
+                  <p>${message}</p>
+                </div>
+                <div class="text-xs text-gray-400 mt-1 flex justify-end">刚刚</div>
+              </div>
+              <div class="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                <img src="https://picsum.photos/id/1005/200/200" alt="用户头像" class="w-full h-full object-cover">
+              </div>
+            </div>
+          </div>
+        `;
+        
+        chatContainer.insertAdjacentHTML('beforeend', userMessageHTML);
+        
+        // 清空输入框
+        input.value = '';
+        
+        // 滚动到底部
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        
+        // 模拟AI回复（实际应用中应该调用API）
+        setTimeout(function() {
+          const aiResponseHTML = `
+            <div class="animate-fade-in">
+              <div class="flex items-start space-x-3">
+                <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                  <i class="fa-solid fa-robot text-white"></i>
+                </div>
+                <div class="max-w-[90%]">
+                  <div class="bg-white rounded-lg rounded-tl-none shadow-card p-4">
+                    <p>感谢你的提问！我正在根据你提供的信息生成相关内容，请稍候...</p>
+                    <div class="mt-3 bg-gray-50 p-3 rounded-lg animate-pulse-slow">
+                      <div class="h-3 bg-gray-300 rounded w-3/4 mb-2"></div>
+                      <div class="h-3 bg-gray-300 rounded w-1/2 mb-2"></div>
+                      <div class="h-3 bg-gray-300 rounded w-5/6"></div>
+                    </div>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-1">刚刚</div>
+                </div>
+              </div>
+            </div>
+          `;
+          
+          chatContainer.insertAdjacentHTML('beforeend', aiResponseHTML);
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }, 1000);
+      }
+    });
+    
+    // 按Enter发送消息
+    document.getElementById('messageInput').addEventListener('keydown', function(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        document.getElementById('sendBtn').click();
+      }
+    });
+    
+    // 导航栏滚动效果
+    window.addEventListener('scroll', function() {
+      const navbar = document.getElementById('navbar');
+      if (window.scrollY > 10) {
+        navbar.classList.add('shadow');
+      } else {
+        navbar.classList.remove('shadow');
+      }
+    });
+
+    // 账号折叠功能
+    function toggleAccount(header) {
+      const content = header.nextElementSibling;
+      const arrow = header.querySelector('.fa-chevron-down');
+      
+      // 关闭其他打开的账号
+      document.querySelectorAll('.account-content').forEach(item => {
+        if (item !== content && !item.classList.contains('hidden')) {
+          item.classList.add('hidden');
+          item.previousElementSibling.querySelector('.fa-chevron-down').classList.remove('rotate-180');
+        }
+      });
+      
+      // 切换当前账号
+      content.classList.toggle('hidden');
+      arrow.classList.toggle('rotate-180');
+    }
+
+    // 页面切换功能
+    function switchPage(pageId) {
+      // 隐藏所有页面
+      document.querySelectorAll('#pageContent > div').forEach(page => {
+        page.classList.add('hidden');
+      });
+      
+      // 显示目标页面
+      const targetPage = document.getElementById(pageId);
+      if (targetPage) {
+        targetPage.classList.remove('hidden');
+      }
+      
+      // 更新侧边栏选中状态
+      document.querySelectorAll('#sidebar a').forEach(link => {
+        if (link.getAttribute('data-page') === pageId) {
+          link.classList.remove('text-gray-500', 'hover:bg-gray-100');
+          link.classList.add('bg-primary/10', 'text-primary');
+        } else {
+          link.classList.remove('bg-primary/10', 'text-primary');
+          link.classList.add('text-gray-500', 'hover:bg-gray-100');
+        }
+      });
+    }
+
+    // 初始化页面切换事件
+    document.addEventListener('DOMContentLoaded', function() {
+      // 为所有导航链接添加点击事件
+      document.querySelectorAll('#sidebar a[data-page]').forEach(link => {
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          const pageId = this.getAttribute('data-page');
+          switchPage(pageId);
+        });
+      });
+
+      // 默认显示智能对话页面
+      switchPage('chatPage');
+    });
+  </script>
+</body>
+</html>
+    

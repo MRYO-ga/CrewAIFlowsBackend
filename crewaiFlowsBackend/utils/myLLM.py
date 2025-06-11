@@ -107,7 +107,7 @@ def chat_with_llm(messages, llmType="openai", model=OPENAI_CHAT_MODEL):
                 f"{OPENAI_API_BASE}/chat/completions", 
                 headers=headers,
                 json=payload,
-                timeout=30
+                timeout=60
             )
             
             print(f"API响应状态码: {response.status_code}")
@@ -331,7 +331,7 @@ content_creation      | content_creator          | 爆款内容、图文/视频�
     messages.append({"role": "user", "content": user_input})
     
     # 调用LLM获取回复，显式指定使用openai类型
-    response = chat_with_llm(messages, llmType="openai", model="deepseek-r1")
+    response = chat_with_llm(messages, llmType="openai", model="gpt-4o")
     
     try:
         # 解析JSON响应
