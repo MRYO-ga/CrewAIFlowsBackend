@@ -33,3 +33,8 @@ pillow==10.0.1
 bs4==0.0.1
 pandas==2.1.1
 selenium==4.15.2
+
+# MCP相关依赖
+mcp==1.0.0
+fastmcp==0.1.0
+mcp-sqlite==0.1.3

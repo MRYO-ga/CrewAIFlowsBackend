@@ -71,3 +71,5 @@ Thumbs.db
 .crewai_cache/
 .crewai_outputs/ 
 *.txt
+*.rdb
+*.xlsx

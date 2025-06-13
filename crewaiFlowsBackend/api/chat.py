@@ -43,99 +43,38 @@ class OptimizationRequest(BaseModel):
 
 @chat_router.post("/chat")
 async def chat_with_agent(request: ChatRequest):
-    """智能聊天接口，集成MCP数据获取功能"""
+    """智能聊天接口，集成MCP工具调用和任务拆解功能"""
     try:
         print(f"收到聊天请求，用户ID: {request.user_id}")
         print(f"用户输入: {request.user_input}")
         
-        # 检查是否需要智能数据获取和优化
-        if any(keyword in request.user_input.lower() for keyword in ["优化", "账号", "基础信息", "竞品", "内容", "发布"]):
-            print("检测到优化需求，启动智能数据分析...")
-            
-            # 通过MCP获取用户相关数据
-            user_context = smart_data_manager.get_user_data_context(request.user_id)
-            print(f"获取用户上下文数据: {len(user_context)} 个模块")
-            
-            # 判断具体的优化类型
-            optimization_target = "comprehensive"
-            if "账号" in request.user_input or "基础信息" in request.user_input:
-                optimization_target = "account_info"
-            elif "内容" in request.user_input:
-                optimization_target = "content_strategy"
-            elif "发布" in request.user_input or "计划" in request.user_input:
-                optimization_target = "publishing_plan"
-            
-            # 执行智能分析和优化
-            optimization_result = smart_data_manager.analyze_and_optimize(
-                request.user_id, 
-                optimization_target, 
-                user_context
-            )
-            
-            # 构建包含优化建议的回复
-            optimized_reply = f"""基于您的{optimization_target}优化需求，我已经分析了您的账号数据：
-
-📊 **当前数据概览**：
-• 账号名称：{user_context.get('account_info', {}).get('account_name', '未知')}
-• 粉丝数量：{user_context.get('account_info', {}).get('profile_data', {}).get('followers_count', 0):,}
-• 平均互动率：{user_context.get('account_info', {}).get('performance_metrics', {}).get('engagement_rate', 0)}%
-
-🎯 **智能分析结果**："""
-
-            if optimization_result.get('optimization_result'):
-                opt_result = optimization_result['optimization_result']
-                if isinstance(opt_result, dict):
-                    if 'optimized_bio' in opt_result:
-                        optimized_reply += f"\n\n**优化后的个人简介**：\n{opt_result['optimized_bio']}"
-                    if 'recommended_tags' in opt_result:
-                        optimized_reply += f"\n\n**建议标签**：{', '.join(opt_result['recommended_tags'])}"
-                    if 'improvement_actions' in opt_result:
-                        optimized_reply += f"\n\n**具体改进措施**：\n" + "\n".join([f"• {action}" for action in opt_result['improvement_actions']])
-                else:
-                    optimized_reply += f"\n{opt_result}"
-            
-            # 添加竞品参考信息
-            if user_context.get('competitor_analysis'):
-                competitors = user_context['competitor_analysis']
-                optimized_reply += f"\n\n📈 **竞品参考**：\n"
-                for comp in competitors[:2]:  # 只显示前2个竞品
-                    optimized_reply += f"• {comp['name']}：{comp['follower_count']} 粉丝，擅长{comp['category']}\n"
-            
-            # 添加后续建议
-            optimized_reply += f"\n\n💡 **下一步建议**：\n• 根据以上分析实施优化措施\n• 定期监控数据变化\n• 持续调整策略以获得最佳效果"
-            
-            return {
-                "reply": optimized_reply,
-                "data": {
-                    "optimization_result": optimization_result,
-                    "user_context_summary": {
-                        "account_name": user_context.get('account_info', {}).get('account_name'),
-                        "followers_count": user_context.get('account_info', {}).get('profile_data', {}).get('followers_count'),
-                        "content_count": len(user_context.get('content_library', [])),
-                        "competitor_count": len(user_context.get('competitor_analysis', []))
-                    }
-                }
-            }
+        # 使用新的聊天服务
+        from services.chat_service import ChatService
         
-        # 如果不是优化需求，使用普通的意图解析Agent
-        result = interact_with_intent_agent(
-            request.user_input,
-            request.conversation_history
+        chat_service = ChatService()
+        
+        # 处理用户消息
+        response = await chat_service.process_message(
+            user_input=request.user_input,
+            user_id=request.user_id,
+            conversation_history=request.conversation_history
         )
         
-        # 如果意图解析完成且包含crew配置，也可以提供相关数据
-        if result.get("data") and result["data"].get("crew"):
-            print(f"意图解析完成，解析结果: {result['data']}")
-            
-            # 可以在这里添加相关的数据支持
-            crew_config = result["data"].get("crew", {})
-            if crew_config:
-                # 获取相关的背景数据
-                context_data = smart_data_manager.get_user_data_context(request.user_id)
-                result["data"]["context_data"] = {
-                    "account_summary": context_data.get('account_info', {}).get('account_name', ''),
-                    "available_data": list(context_data.keys())
-                }
+        # 转换为API响应格式
+        result = {
+            "status": "success",
+            "message": "处理完成",
+            "final_answer": response.final_answer,
+            "data": {
+                "task_decomposition": response.task_decomposition.dict() if response.task_decomposition else None,
+                "steps_executed": [step.dict() for step in response.steps_executed],
+                "metadata": response.metadata,
+                "tools_used": response.metadata.get("tools_used", [])
+            }
+        }
+        
+        print(f"处理完成，步骤数: {response.metadata.get('steps_count', 0)}")
+        print(f"使用的工具: {response.metadata.get('tools_used', [])}")
         
         return result
         
@@ -144,33 +83,33 @@ async def chat_with_agent(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@chat_router.post("/optimize")
-async def optimize_user_data(request: OptimizationRequest):
-    """专门的用户数据优化接口"""
-    try:
-        print(f"收到优化请求，用户ID: {request.user_id}, 优化类型: {request.optimization_type}")
+# @chat_router.post("/optimize")
+# async def optimize_user_data(request: OptimizationRequest):
+#     """专门的用户数据优化接口"""
+#     try:
+#         print(f"收到优化请求，用户ID: {request.user_id}, 优化类型: {request.optimization_type}")
         
-        # 获取用户数据上下文
-        user_context = smart_data_manager.get_user_data_context(request.user_id)
+#         # 获取用户数据上下文
+#         user_context = smart_data_manager.get_user_data_context(request.user_id)
         
-        # 执行智能分析和优化
-        optimization_result = smart_data_manager.analyze_and_optimize(
-            request.user_id,
-            request.optimization_type,
-            user_context
-        )
+#         # 执行智能分析和优化
+#         optimization_result = smart_data_manager.analyze_and_optimize(
+#             request.user_id,
+#             request.optimization_type,
+#             user_context
+#         )
         
-        return {
-            "status": "success",
-            "user_id": request.user_id,
-            "optimization_type": request.optimization_type,
-            "result": optimization_result,
-            "timestamp": optimization_result.get("timestamp")
-        }
+#         return {
+#             "status": "success",
+#             "user_id": request.user_id,
+#             "optimization_type": request.optimization_type,
+#             "result": optimization_result,
+#             "timestamp": optimization_result.get("timestamp")
+#         }
         
-    except Exception as e:
-        print(f"优化处理出错: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+#     except Exception as e:
+#         print(f"优化处理出错: {str(e)}")
+#         raise HTTPException(status_code=500, detail=str(e))
 
 
 @chat_router.get("/user-context/{user_id}")
@@ -197,6 +136,128 @@ async def get_user_context(user_id: str, data_type: str = "all"):
         print(f"获取用户上下文出错: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@chat_router.post("/chat/stream")
+async def stream_chat_with_agent(request: ChatRequest):
+    """流式聊天接口，实时展示任务执行步骤"""
+    from fastapi.responses import StreamingResponse
+    from services.chat_service import ChatService
+    import json
+    
+    async def generate_stream():
+        try:
+            chat_service = ChatService()
+            
+            async for chunk in chat_service.stream_message(
+                user_input=request.user_input,
+                user_id=request.user_id,
+                conversation_history=request.conversation_history
+            ):
+                # 将数据转换为JSON格式并发送
+                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                
+        except Exception as e:
+            error_chunk = {
+                "type": "error",
+                "message": f"流式处理出错: {str(e)}",
+                "error": str(e)
+            }
+            yield f"data: {json.dumps(error_chunk, ensure_ascii=False)}\n\n"
+    
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Content-Type": "text/event-stream"
+        }
+    )
+
+@chat_router.post("/chat/analyze")
+async def analyze_user_request(request: ChatRequest):
+    """分析用户请求，返回任务拆解结果"""
+    try:
+        print(f"分析用户请求，用户ID: {request.user_id}")
+        print(f"用户输入: {request.user_input}")
+        
+        from services.chat_service import ChatService
+        
+        chat_service = ChatService()
+        
+        # 分析用户请求
+        task_decomposition = await chat_service.analyze_user_request(request.user_input)
+        
+        result = {
+            "status": "success",
+            "message": "分析完成",
+            "data": {
+                "task_decomposition": task_decomposition.dict(),
+                "estimated_steps": len(task_decomposition.steps),
+                "requires_tools": task_decomposition.requires_tools,
+                "tool_names": task_decomposition.tool_names
+            }
+        }
+        
+        print(f"分析完成，拆解为 {len(task_decomposition.steps)} 个步骤")
+        print(f"需要工具: {task_decomposition.requires_tools}")
+        
+        return result
+        
+    except Exception as e:
+        print(f"分析请求出错: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@chat_router.get("/chat/tools")
+async def get_available_tools():
+    """获取当前可用的工具列表"""
+    try:
+        from services.chat_service import ChatService
+        from services.mcp_server_manager import mcp_server_manager
+        
+        chat_service = ChatService()
+        tools = await chat_service.get_available_tools()
+        
+        # 获取当前连接的服务器信息
+        current_server = mcp_server_manager.get_current_server()
+        
+        return {
+            "status": "success",
+            "message": "获取工具列表成功",
+            "data": {
+                "tools": tools,
+                "count": len(tools),
+                "current_server": {
+                    "name": current_server.name if current_server else None,
+                    "description": current_server.description if current_server else None,
+                    "tools_count": current_server.tools_count if current_server else 0,
+                    "status": current_server.status.value if current_server else "unknown"
+                }
+            }
+        }
+        
+    except Exception as e:
+        print(f"获取工具列表出错: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@chat_router.get("/chat/context/{user_id}")
+async def get_chat_context(user_id: str):
+    """获取用户的聊天上下文"""
+    try:
+        from services.chat_service import ChatService
+        
+        chat_service = ChatService()
+        context = await chat_service.get_chat_context(user_id)
+        
+        return {
+            "status": "success",
+            "message": "获取聊天上下文成功",
+            "data": context
+        }
+        
+    except Exception as e:
+        print(f"获取聊天上下文出错: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @chat_router.get("/chat/history")
 async def get_chat_history():

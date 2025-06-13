@@ -1,0 +1,24 @@
+{
+  "servers": {
+    "sqlite_final": {
+      "auto_connect": true,
+      "priority": 0,
+      "description": "最终版SQLite MCP服务器 - 功能完整且稳定",
+      "disabled": false,
+      "tools_count": 5,
+      "last_connected": "2025-06-14T00:01:42.033039",
+      "status": "connected",
+      "error_message": null
+    },
+    "weather": {
+      "auto_connect": true,
+      "priority": 2,
+      "description": "天气预报MCP服务器 提供美国各州天气警报和预报功能",
+      "disabled": false,
+      "tools_count": 2,
+      "last_connected": "2025-06-13T23:55:27.676823",
+      "status": "available",
+      "error_message": null
+    }
+  }
+}

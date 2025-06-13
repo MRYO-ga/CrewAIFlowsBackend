@@ -11,11 +11,23 @@
 
 
 # 导入标准库
+import sys
+import asyncio
 import uvicorn
+
+# 在所有其他导入之前设置Windows事件循环策略
+if sys.platform == "win32":
+    # 设置ProactorEventLoopPolicy以支持子进程
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    print("🔧 已在模块导入时设置Windows Proactor事件循环策略")
 # 导入第三方库
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from fastapi import Request
+from pathlib import Path
 # 数据库相关导入
 from database.database import create_tables
 # 导入所有模型以确保表被创建
@@ -35,10 +47,14 @@ from api import (
     tasks_router,
     sops_router
 )
+from api.mcp_router import router as mcp_router
 
 
 # 服务访问的端口
 PORT = 9000
+
+# 配置模板
+templates = Jinja2Templates(directory="templates")
 
 
 # 定义了一个异步函数lifespan，它接收一个FastAPI应用实例app作为参数。这个函数将管理应用的生命周期，包括启动和关闭时的操作
@@ -88,10 +104,31 @@ app.include_router(analytics_router)
 app.include_router(crew_router)
 app.include_router(tasks_router)
 app.include_router(sops_router)
+app.include_router(mcp_router)
+
+# MCP演示页面路由
+@app.get("/mcp-demo")
+async def mcp_demo(request: Request):
+    """MCP聊天演示页面"""
+    return templates.TemplateResponse("mcp_chat.html", {"request": request})
 
 
 if __name__ == '__main__':
+    from startup_check import full_startup_check
+    
+    # 运行启动检查
+    print("🚀 运行系统启动检查...")
+    try:
+        check_result = asyncio.run(full_startup_check())
+        if not check_result:
+            print("💥 启动检查失败，请检查系统设置")
+            sys.exit(1)
+    except Exception as e:
+        print(f"⚠️ 启动检查时出现异常: {e}")
+        print("⚠️ 将继续启动，但可能遇到兼容性问题")
+    
     print(f"在端口 {PORT} 上启动小红书多Agent自动化运营系统")
-    # uvicorn是一个用于运行ASGI应用的轻量级、超快速的ASGI服务器实现
-    # 用于部署基于FastAPI框架的异步PythonWeb应用程序
+    print("🌐 MCP演示页面: http://localhost:9000/mcp-demo")
+    
+    # 直接使用标准启动方式，事件循环策略已在模块导入时设置
     uvicorn.run(app, host="0.0.0.0", port=PORT)
