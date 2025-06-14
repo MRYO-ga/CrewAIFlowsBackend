@@ -173,14 +173,21 @@ class MCPServerManager:
                             except Exception:
                                 server.last_connected = None
                         
-                        # 加载状态
+                        # 加载状态 - 修复：将之前CONNECTED状态重置为AVAILABLE
                         if server_config.get('disabled', False):
                             server.status = ServerStatus.DISABLED
                         elif server_config.get('status'):
                             try:
-                                server.status = ServerStatus(server_config['status'])
+                                config_status = ServerStatus(server_config['status'])
+                                # 重要修复：应用重启时，之前CONNECTED的服务器应该是AVAILABLE状态
+                                if config_status == ServerStatus.CONNECTED:
+                                    server.status = ServerStatus.AVAILABLE
+                                else:
+                                    server.status = config_status
                             except ValueError:
                                 server.status = ServerStatus.AVAILABLE
+                        else:
+                            server.status = ServerStatus.AVAILABLE
                 
                 print(f"📋 加载服务器配置: {self.config_file}")
             except Exception as e:

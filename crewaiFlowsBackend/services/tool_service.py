@@ -49,19 +49,18 @@ class ToolService:
                 for tool in tools
             ]
             
-            print("📋 [工具服务] 工具详细信息:")
-            for i, info in enumerate(tool_info, 1):
-                print(f"   {i}. {info['name']}: {info['description']}")
+            # print("📋 [工具服务] 工具详细信息:")
+            # for i, info in enumerate(tool_info, 1):
+            #     print(f"   {i}. {info['name']}: {info['description']}")
             
-            self.mcp_client.add_logs(tool_info, LogType.GET_TOOLS)
-            self.logger.info(f"成功获取 {len(tools)} 个工具")
+            # self.mcp_client.add_logs(tool_info, LogType.GET_TOOLS)
             
             print(f"🎉 [工具服务] 工具列表获取完成，共 {len(tools)} 个工具")
             return tools
             
         except Exception as error:
             print(f"❌ [工具服务] 获取工具列表失败: {error}")
-            self.mcp_client.add_logs(str(error), LogType.GET_TOOLS_ERROR)
+            # self.mcp_client.add_logs(str(error), LogType.GET_TOOLS_ERROR)
             self.logger.error(f"获取工具列表失败: {error}")
             raise Exception(f"获取工具列表失败: {error}")
     
@@ -86,7 +85,7 @@ class ToolService:
                 "arguments": tool_args,
                 "timestamp": datetime.now().isoformat()
             }
-            self.mcp_client.add_logs(call_info, LogType.TOOL_CALL)
+            # self.mcp_client.add_logs(call_info, LogType.TOOL_CALL)
             self.logger.info(f"调用工具: {tool_name}")
             
             # 执行工具调用
@@ -95,7 +94,7 @@ class ToolService:
             print(f"✅ [工具服务] MCP客户端调用成功，结果类型: {type(result)}")
             
             # 记录调用结果
-            self.mcp_client.add_logs(result.content, LogType.TOOL_CALL_RESPONSE)
+            # self.mcp_client.add_logs(result.content, LogType.TOOL_CALL_RESPONSE)
             self.logger.info(f"工具 {tool_name} 调用成功")
             
             print(f"🎉 [工具服务] 工具 {tool_name} 调用完成")
@@ -103,7 +102,7 @@ class ToolService:
             
         except Exception as error:
             print(f"❌ [工具服务] 调用工具 {tool_name} 失败: {error}")
-            self.mcp_client.add_logs(str(error), LogType.TOOL_CALL_ERROR)
+            # self.mcp_client.add_logs(str(error), LogType.TOOL_CALL_ERROR)
             self.logger.error(f"调用工具 {tool_name} 失败: {error}")
             raise Exception(f"调用工具 {tool_name} 失败: {error}")
     

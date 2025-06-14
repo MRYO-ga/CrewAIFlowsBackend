@@ -1,15 +1,14 @@
 """
-LLM服务模块
-负责处理大语言模型的调用、任务拆解和工具集成
+简化的LLM服务模块
+让LLM直接决定是否使用MCP工具，支持流式输出
 """
 
 import asyncio
 import json
 import logging
-from typing import Dict, List, Any, Optional, Union, AsyncGenerator
+import re
+from typing import Dict, List, Any, Optional, AsyncGenerator
 from datetime import datetime
-from enum import Enum
-
 import sys
 import os
 from pathlib import Path
@@ -25,45 +24,20 @@ from pydantic import BaseModel
 from .tool_service import ToolService
 from .mcp_client_service import MCPClientService, LogType
 
-class TaskType(Enum):
-    """任务类型枚举"""
-    SIMPLE_QUERY = "simple_query"  # 简单查询，无需工具
-    DATA_READ = "data_read"  # 数据读取
-    DATA_WRITE = "data_write"  # 数据写入
-    DATA_ANALYSIS = "data_analysis"  # 数据分析
-    COMPLEX_TASK = "complex_task"  # 复杂任务，需要多步骤
-
-class TaskStep(BaseModel):
-    """任务步骤模型"""
-    step_id: int
-    step_name: str
-    step_description: str
-    tool_name: Optional[str] = None
-    tool_args: Optional[Dict[str, Any]] = None
-    result: Optional[Any] = None
-    status: str = "pending"  # pending, running, completed, failed
-    error: Optional[str] = None
-
-class TaskDecomposition(BaseModel):
-    """任务拆解结果模型"""
-    task_type: TaskType
-    task_description: str
-    steps: List[TaskStep]
-    estimated_time: Optional[int] = None  # 预估时间（秒）
-    requires_tools: bool = False
-    tool_names: List[str] = []
-
-class LLMResponse(BaseModel):
-    """LLM响应模型"""
+class ChatMessage(BaseModel):
+    """聊天消息模型"""
+    role: str
     content: str
-    task_decomposition: Optional[TaskDecomposition] = None
-    tool_calls: List[Dict[str, Any]] = []
-    steps_executed: List[TaskStep] = []
-    final_answer: str
-    metadata: Dict[str, Any] = {}
+
+class StreamChunk(BaseModel):
+    """流式输出数据块"""
+    type: str  # message, tool_call, tool_result, complete, error
+    content: str = ""
+    data: Optional[Dict[str, Any]] = None
+    timestamp: str = ""
 
 class LLMService:
-    """LLM服务类"""
+    """简化的LLM服务类"""
     
     def __init__(self, tool_service: ToolService, api_key: str = None, model: str = "gpt-4o-mini", llm_type: str = "openai"):
         """
@@ -71,337 +45,483 @@ class LLMService:
         
         Args:
             tool_service: 工具服务实例
-            api_key: API密钥（已配置在myLLM.py中）
-            model: 使用的模型名称
-            llm_type: LLM类型（openai, oneapi, ollama）
+            api_key: API密钥
+            model: 模型名称
+            llm_type: LLM类型
         """
         self.tool_service = tool_service
+        self.api_key = api_key
         self.model = model
         self.llm_type = llm_type
         self.logger = logging.getLogger(__name__)
         
-        print(f"🤖 初始化LLM服务: 类型={llm_type}, 模型={model}")
-        
-        # 不再使用AsyncOpenAI客户端，而是使用myLLM中的配置
-        
-        # 系统提示词
-        self.system_prompt = """你是一个智能助手，能够帮助用户完成各种任务。
-你可以使用以下能力：
-1. 分析用户问题并拆解为具体步骤
-2. 调用工具获取和处理数据
-3. 提供清晰的步骤执行过程
-4. 给出最终答案和建议
+        # 基础系统提示词，工具信息将在运行时动态添加
+        self.base_system_prompt = """你是一个专业的AI开发助手和数据分析专家。
 
-当用户提出问题时，请按照以下流程：
-1. 分析问题类型和复杂度
-2. 如果需要工具，拆解为具体步骤
-3. 按步骤执行并展示过程
-4. 提供最终答案
+作为开发助手，你可以：
+- 查询和分析数据库中的数据
+- 执行数据库的增删改查操作
+- 提供数据结构和架构信息
+- 协助数据分析和洞察生成
+- 处理用户的开发需求和技术问题
 
-请用中文回答用户问题。"""
+**工具调用关键规则（必须严格遵循）：**
+1. 当需要数据库操作时，立即调用相应工具，不要承诺稍后调用
+2. 工具调用必须严格按照JSON格式：{"tool_call": {"name": "工具名", "args": {...}}}
+3. 工具调用必须放在```json代码块中
+4. 验证参数格式后再发送调用，不确定时询问澄清而非猜测
+5. 每次只调用一个工具
+6. 如果任务需要多个步骤，持续使用工具直到完成，不要在第一次失败时停止
+
+**工具使用边界：**
+使用工具的情况：
+- 用户询问数据库表结构、数据内容
+- 用户要求查询、插入、更新、删除数据
+- 用户需要数据分析或统计信息
+- 用户要求执行任何SQL操作
+- 用户询问具体的数据库架构信息
+
+不使用工具的情况：
+- 用户询问一般性的编程概念或理论问题
+- 用户要求代码示例（非数据库操作）
+- 用户寻求技术建议或最佳实践
+- 用户进行简单的问候或闲聊
+
+**数据库操作执行顺序：**
+1. 查看表结构前，先列出所有表
+2. 插入数据前，确认表结构和字段要求
+3. 复杂查询前，了解相关表的关系
+4. 修改数据前，先查询确认现有数据
+
+**重要格式规范：**
+- sqlite_insert_data工具的data参数必须是JSON字符串格式，如："{\"name\": \"张三\", \"age\": 25}"
+- UPDATE/DELETE操作使用sqlite_query工具
+- 所有SELECT查询使用sqlite_query工具
+- 表结构查询使用sqlite_describe_table工具
+
+**工具调用示例：**
+```json
+{
+  "tool_call": {
+    "name": "sqlite_list_tables",
+    "args": {}
+  }
+}
+```
+
+```json
+{
+  "tool_call": {
+    "name": "sqlite_insert_data",
+    "args": {
+      "table_name": "accounts",
+      "data": "{\"name\": \"新用户\", \"status\": \"active\"}"
+    }
+  }
+}
+```
+
+**禁止行为：**
+- 不要说"我将为您调用工具"或"稍后我会查询数据库"，需要工具时立即调用
+- 不要猜测参数值，不确定时请要求用户澄清
+- 不要在单次响应中承诺多个工具调用，按需逐个执行
+- 不要使用除了指定JSON格式外的任何工具调用格式"""
         
-    async def analyze_user_input(self, user_input: str, conversation_history: Optional[List[Dict[str, Any]]] = None) -> TaskDecomposition:
+    async def process_message_stream(self, user_input: str, conversation_history: Optional[List[Dict[str, Any]]] = None) -> AsyncGenerator[StreamChunk, None]:
         """
-        分析用户输入并拆解任务
+        流式处理用户消息，支持工具调用
         
         Args:
             user_input: 用户输入
             conversation_history: 对话历史
             
-        Returns:
-            任务拆解结果
+        Yields:
+            StreamChunk: 流式输出数据块
         """
         try:
-            print(f"🔍 [分析阶段] 开始分析用户输入: '{user_input}'")
-            
-            # 获取可用工具
-            print("📦 [分析阶段] 正在获取可用工具列表...")
+            # 获取可用工具并构建完整的系统提示词
             available_tools = await self.tool_service.get_tools_for_llm()
-            print(f"✅ [分析阶段] 获取到 {len(available_tools)} 个可用工具:")
-            for i, tool in enumerate(available_tools, 1):
-                print(f"   {i}. {tool['name']}: {tool['description']}")
+            tools_text = self._format_tools_for_llm(available_tools)
             
-            # 构建分析提示
-            analysis_prompt = f"""
-请分析以下用户问题，并判断是否需要使用工具来完成任务。
+            system_prompt = f"""你是一个专业的AI开发助手和数据分析专家。
 
-用户问题：{user_input}
+作为开发助手，你可以使用以下工具执行数据库操作：
 
-可用工具：
-{json.dumps(available_tools, ensure_ascii=False, indent=2)}
+{tools_text}
 
-请按照以下JSON格式返回分析结果：
-{{
-    "task_type": "simple_query|data_read|data_write|data_analysis|complex_task",
-    "task_description": "任务描述",
-    "requires_tools": true/false,
-    "tool_names": ["工具名称列表"],
-    "steps": [
-        {{
-            "step_id": 1,
-            "step_name": "步骤名称",
-            "step_description": "步骤描述",
-            "tool_name": "工具名称或null",
-            "tool_args": {{"参数": "值"}}
-        }}
-    ],
-    "estimated_time": 预估时间秒数
-}}
+{self.base_system_prompt}"""
 
-请只返回JSON，不要其他内容。
-"""
-            
-            # 调用LLM分析
-            print("🧠 [分析阶段] 准备调用LLM进行任务分析...")
-            print(f"📝 [分析阶段] 分析提示词长度: {len(analysis_prompt)} 字符")
-            
-            messages = [
-                {"role": "system", "content": "你是一个任务分析专家，能够将用户问题拆解为具体的执行步骤。"},
-                {"role": "user", "content": analysis_prompt}
-            ]
-            
-            print("⏳ [分析阶段] 正在调用LLM...")
-            response = await self._call_llm(messages)
-            print(f"📄 [分析阶段] LLM分析响应: {response[:200]}..." if len(response) > 200 else f"📄 [分析阶段] LLM分析响应: {response}")
-            
-            # 解析返回结果
-            print("🔧 [分析阶段] 开始解析LLM响应...")
-            try:
-                analysis_result = json.loads(response)
-                print("✅ [分析阶段] JSON解析成功")
-                print(f"📋 [分析阶段] 任务类型: {analysis_result.get('task_type', 'unknown')}")
-                print(f"🎯 [分析阶段] 任务描述: {analysis_result.get('task_description', 'unknown')}")
-                print(f"🛠️ [分析阶段] 需要工具: {analysis_result.get('requires_tools', False)}")
-                print(f"📝 [分析阶段] 工具列表: {analysis_result.get('tool_names', [])}")
-                print(f"⏱️ [分析阶段] 预计时间: {analysis_result.get('estimated_time', 'unknown')} 秒")
-                
-                # 构建TaskStep对象
-                steps = []
-                steps_data = analysis_result.get("steps", [])
-                print(f"📊 [分析阶段] 拆解为 {len(steps_data)} 个步骤:")
-                
-                for step_data in steps_data:
-                    step = TaskStep(
-                        step_id=step_data.get("step_id", 0),
-                        step_name=step_data.get("step_name", ""),
-                        step_description=step_data.get("step_description", ""),
-                        tool_name=step_data.get("tool_name"),
-                        tool_args=step_data.get("tool_args")
-                    )
-                    steps.append(step)
-                    print(f"   步骤{step.step_id}: {step.step_name} (工具: {step.tool_name or '无'})")
-                
-                # 构建TaskDecomposition对象
-                task_decomposition = TaskDecomposition(
-                    task_type=TaskType(analysis_result.get("task_type", "simple_query")),
-                    task_description=analysis_result.get("task_description", user_input),
-                    steps=steps,
-                    estimated_time=analysis_result.get("estimated_time"),
-                    requires_tools=analysis_result.get("requires_tools", False),
-                    tool_names=analysis_result.get("tool_names", [])
-                )
-                
-                print("🎉 [分析阶段] 任务分析完成！")
-                return task_decomposition
-                
-            except json.JSONDecodeError as e:
-                # 如果JSON解析失败，创建简单任务
-                print(f"❌ [分析阶段] JSON解析失败: {e}")
-                print(f"📄 [分析阶段] 原始响应: {response}")
-                print("🔄 [分析阶段] 创建默认简单任务...")
-                self.logger.warning("LLM返回的JSON格式不正确，创建简单任务")
-                return TaskDecomposition(
-                    task_type=TaskType.SIMPLE_QUERY,
-                    task_description=user_input,
-                    steps=[TaskStep(
-                        step_id=1,
-                        step_name="回答问题",
-                        step_description="直接回答用户问题",
-                        tool_name=None,
-                        tool_args=None
-                    )],
-                    requires_tools=False,
-                    tool_names=[]
-                )
-                
-        except Exception as error:
-            self.logger.error(f"分析用户输入失败: {error}")
-            # 返回默认的简单任务
-            return TaskDecomposition(
-                task_type=TaskType.SIMPLE_QUERY,
-                task_description=user_input,
-                steps=[TaskStep(
-                    step_id=1,
-                    step_name="回答问题",
-                    step_description="直接回答用户问题",
-                    tool_name=None,
-                    tool_args=None
-                )],
-                requires_tools=False,
-                tool_names=[]
-            )
-    
-    async def execute_task(self, task_decomposition: TaskDecomposition, user_input: str) -> LLMResponse:
-        """
-        执行任务
-        
-        Args:
-            task_decomposition: 任务拆解结果
-            user_input: 原始用户输入
-            
-        Returns:
-            LLM响应结果
-        """
-        try:
-            print(f"🚀 [执行阶段] 开始执行任务: {task_decomposition.task_description}")
-            print(f"📋 [执行阶段] 任务类型: {task_decomposition.task_type.value}")
-            print(f"🛠️ [执行阶段] 需要工具: {task_decomposition.requires_tools}")
-            print(f"📊 [执行阶段] 共有 {len(task_decomposition.steps)} 个步骤需要执行")
-            
-            executed_steps = []
-            tool_results = []
-            
-            # 执行每个步骤
-            for step in task_decomposition.steps:
-                print(f"\n⚡ [执行阶段] 执行步骤 {step.step_id}: {step.step_name}")
-                print(f"📄 [执行阶段] 步骤描述: {step.step_description}")
-                print(f"🔧 [执行阶段] 需要工具: {step.tool_name or '无'}")
-                if step.tool_args:
-                    print(f"📝 [执行阶段] 工具参数: {step.tool_args}")
-                
-                step.status = "running"
-                self.logger.info(f"执行步骤 {step.step_id}: {step.step_name}")
-                
-                try:
-                    if step.tool_name:
-                        # 需要调用工具
-                        print(f"🛠️ [执行阶段] 正在调用工具: {step.tool_name}")
-                        result = await self.tool_service.call_tool(step.tool_name, step.tool_args or {})
-                        print(f"📦 [执行阶段] 工具调用返回原始结果: {type(result)}")
-                        
-                        step.result = self.tool_service.format_tool_result(result)
-                        print(f"✅ [执行阶段] 工具结果格式化完成: {step.result}")
-                        
-                        tool_results.append({
-                            "step_id": step.step_id,
-                            "tool_name": step.tool_name,
-                            "result": step.result
+            # 构建对话历史
+            messages = [{"role": "system", "content": system_prompt}]
+            print(f"🔍 构建的系统提示词: {system_prompt}")
+            # 添加历史对话
+            if conversation_history:
+                for msg in conversation_history[-5:]:  # 只保留最近5轮对话
+                    if msg.get("role") in ["user", "assistant"]:
+                        messages.append({
+                            "role": msg["role"],
+                            "content": msg["content"]
                         })
-                    else:
-                        # 不需要工具，直接标记完成
-                        print("⏭️ [执行阶段] 此步骤不需要工具，直接完成")
-                        step.result = {"message": "步骤完成"}
-                    
-                    step.status = "completed"
-                    print(f"✅ [执行阶段] 步骤 {step.step_id} 执行成功")
-                    
-                except Exception as error:
-                    step.status = "failed"
-                    step.error = str(error)
-                    print(f"❌ [执行阶段] 步骤 {step.step_id} 执行失败: {error}")
-                    self.logger.error(f"步骤 {step.step_id} 执行失败: {error}")
-                
-                executed_steps.append(step)
             
-            # 生成最终回答
-            final_answer = await self._generate_final_answer(user_input, executed_steps, tool_results)
+            # 添加当前用户输入
+            messages.append({"role": "user", "content": user_input})
             
-            # 构建响应
-            response = LLMResponse(
-                content=final_answer,
-                task_decomposition=task_decomposition,
-                steps_executed=executed_steps,
-                final_answer=final_answer,
-                metadata={
-                    "execution_time": datetime.now().isoformat(),
-                    "steps_count": len(executed_steps),
-                    "tools_used": [step.tool_name for step in executed_steps if step.tool_name],
-                    "success_rate": len([s for s in executed_steps if s.status == "completed"]) / len(executed_steps) if executed_steps else 0
-                }
+            # 发送开始处理消息
+            yield StreamChunk(
+                type="start",
+                content="开始处理您的问题...",
+                timestamp=datetime.now().isoformat()
             )
             
-            return response
+            # 开始LLM对话循环
+            max_iterations = 5  # 最大工具调用迭代次数
+            iteration = 0
+            
+            while iteration < max_iterations:
+                iteration += 1
+                
+                # 调用LLM
+                yield StreamChunk(
+                    type="llm_thinking",
+                    content=f"LLM正在思考... (第{iteration}轮)",
+                    timestamp=datetime.now().isoformat()
+                )
+                
+                llm_response = await self._call_llm(messages)
+                
+                # 检查是否包含工具调用
+                tool_call = self._extract_tool_call(llm_response)
+                
+                if tool_call:
+                    # 提取工具调用前的文本内容
+                    tool_call_text = ""
+                    json_pattern = r'```json.*?```'
+                    text_before_tool = re.split(json_pattern, llm_response, flags=re.DOTALL | re.IGNORECASE)
+                    
+                    if text_before_tool and text_before_tool[0].strip():
+                        # 有工具调用前的说明文字，先显示这部分
+                        explanation_text = text_before_tool[0].strip()
+                        yield StreamChunk(
+                            type="ai_message",
+                            content=explanation_text,
+                            timestamp=datetime.now().isoformat()
+                        )
+                    
+                    # 显示工具调用信息
+                    yield StreamChunk(
+                        type="tool_call",
+                        content=f"调用工具: {tool_call['name']}",
+                        data=tool_call,
+                        timestamp=datetime.now().isoformat()
+                    )
+                    
+                    # 执行工具调用
+                    try:
+                        # 修复特定工具的参数格式
+                        fixed_args = self._fix_tool_args(tool_call["name"], tool_call["args"])
+                        
+                        tool_result = await self.tool_service.call_tool(
+                            tool_call["name"], 
+                            fixed_args
+                        )
+                        
+                        # 处理工具结果
+                        result_content = self._format_tool_result(tool_result)
+                        
+                        yield StreamChunk(
+                            type="tool_result",
+                            content=f"工具 {tool_call['name']} 执行完成",
+                            data={"result": result_content, "success": True},
+                            timestamp=datetime.now().isoformat()
+                        )
+                        
+                        # 将工具调用和结果添加到对话历史
+                        messages.append({
+                            "role": "assistant", 
+                            "content": f"我调用了工具 {tool_call['name']}，参数: {json.dumps(tool_call['args'], ensure_ascii=False)}"
+                        })
+                        messages.append({
+                            "role": "user", 
+                            "content": f"工具执行结果：{result_content}"
+                        })
+                        
+                        # 继续下一轮循环，让LLM基于工具结果继续处理
+                        continue
+                        
+                    except Exception as e:
+                        # 工具调用失败
+                        yield StreamChunk(
+                            type="tool_error",
+                            content=f"工具 {tool_call['name']} 执行失败: {str(e)}",
+                            data={"error": str(e)},
+                            timestamp=datetime.now().isoformat()
+                        )
+                        
+                        # 告诉LLM工具调用失败
+                        messages.append({
+                            "role": "assistant", 
+                            "content": f"我尝试调用工具 {tool_call['name']}，但执行失败了。"
+                        })
+                        messages.append({
+                            "role": "user", 
+                            "content": f"工具调用失败：{str(e)}。请不要再使用这个工具，直接回答问题。"
+                        })
+                        
+                        # 继续下一轮循环
+                        continue
+                        
+                else:
+                    # 没有工具调用，直接返回答案
+                    yield StreamChunk(
+                        type="final_answer",
+                        content=llm_response,
+                        timestamp=datetime.now().isoformat()
+                    )
+                    yield StreamChunk(
+                        type="complete",
+                        content="对话完成",
+                        timestamp=datetime.now().isoformat()
+                    )
+                    return
+            
+            # 如果达到最大迭代次数，强制结束
+            yield StreamChunk(
+                type="max_iterations",
+                content="已达到最大工具调用次数，请告诉我您需要什么帮助。",
+                timestamp=datetime.now().isoformat()
+            )
+            yield StreamChunk(
+                type="complete",
+                content="对话完成",
+                timestamp=datetime.now().isoformat()
+            )
             
         except Exception as error:
-            self.logger.error(f"执行任务失败: {error}")
-            # 返回错误响应
-            return LLMResponse(
-                content=f"执行任务时发生错误: {error}",
-                final_answer=f"抱歉，处理您的请求时发生了错误: {error}",
-                metadata={"error": str(error)}
+            self.logger.error(f"流式处理消息失败: {error}")
+            yield StreamChunk(
+                type="error",
+                content=f"处理消息时发生错误: {error}",
+                data={"error": str(error)},
+                timestamp=datetime.now().isoformat()
             )
     
-    async def _generate_final_answer(self, user_input: str, executed_steps: List[TaskStep], tool_results: List[Dict[str, Any]]) -> str:
-        """
-        生成最终答案
+    def _format_tools_for_llm(self, tools: List[Dict[str, Any]]) -> str:
+        """格式化工具信息给LLM，重要信息前置"""
+        if not tools:
+            return "当前没有可用的工具。"
         
-        Args:
-            user_input: 用户输入
-            executed_steps: 执行的步骤
-            tool_results: 工具调用结果
+        tools_text = f"可用工具清单 ({len(tools)}个):\n\n"
+        
+        # 按工具重要性排序，数据库相关工具优先
+        priority_order = {
+            'sqlite_list_tables': 1,
+            'sqlite_describe_table': 2, 
+            'sqlite_query': 3,
+            'sqlite_insert_data': 4,
+            'sqlite_get_schema': 5
+        }
+        
+        sorted_tools = sorted(tools, key=lambda x: priority_order.get(x['name'], 999))
+        
+        for i, tool in enumerate(sorted_tools, 1):
+            tools_text += f"{i}. **{tool['name']}**\n"
+            tools_text += f"   功能: {tool['description']}\n"
             
-        Returns:
-            最终答案
-        """
+            # 添加参数信息（如果有）
+            if tool.get('parameters') and tool['parameters'].get('properties'):
+                props = tool['parameters']['properties']
+                required = tool['parameters'].get('required', [])
+                
+                tools_text += "   参数:\n"
+                for param_name, param_info in props.items():
+                    param_type = param_info.get('type', 'unknown')
+                    is_required = " (必需)" if param_name in required else " (可选)"
+                    tools_text += f"     - {param_name} ({param_type}){is_required}\n"
+            else:
+                tools_text += "   参数: 无\n"
+            
+            tools_text += "\n"
+        
+        return tools_text
+    
+    def _fix_tool_args(self, tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        """修复工具参数格式"""
+        fixed_args = args.copy()
+        
+        # 修复sqlite_insert_data的data参数
+        if tool_name == "sqlite_insert_data" and "data" in fixed_args:
+            data_value = fixed_args["data"]
+            # 如果data是字典，转换为JSON字符串
+            if isinstance(data_value, dict):
+                fixed_args["data"] = json.dumps(data_value, ensure_ascii=False)
+                print(f"🔧 修复sqlite_insert_data参数: {fixed_args}")
+            elif not isinstance(data_value, str):
+                # 如果不是字符串也不是字典，尝试转换为JSON字符串
+                fixed_args["data"] = json.dumps(data_value, ensure_ascii=False)
+                print(f"🔧 修复sqlite_insert_data参数: {fixed_args}")
+        
+        return fixed_args
+    
+    def _extract_tool_call(self, text: str) -> Optional[Dict[str, Any]]:
+        """从LLM响应中提取工具调用，防范幻觉"""
         try:
-            print(f"\n📝 [答案生成] 开始生成最终答案")
-            print(f"❓ [答案生成] 用户问题: {user_input}")
-            print(f"📊 [答案生成] 已执行步骤数: {len(executed_steps)}")
-            print(f"🛠️ [答案生成] 工具调用结果数: {len(tool_results)}")
+            print(f"🔍 尝试从以下文本中提取工具调用:\n{text}")
             
-            # 统计步骤状态
-            completed_steps = [s for s in executed_steps if s.status == "completed"]
-            failed_steps = [s for s in executed_steps if s.status == "failed"]
-            print(f"✅ [答案生成] 成功步骤: {len(completed_steps)}")
-            print(f"❌ [答案生成] 失败步骤: {len(failed_steps)}")
-            
-            # 构建上下文
-            print("🔧 [答案生成] 正在构建上下文...")
-            context = f"""
-用户问题：{user_input}
-
-执行的步骤：
-"""
-            for step in executed_steps:
-                context += f"\n{step.step_id}. {step.step_name} - {step.step_description}"
-                if step.status == "completed" and step.result:
-                    context += f"\n   结果：{json.dumps(step.result, ensure_ascii=False, indent=2)}"
-                elif step.status == "failed":
-                    context += f"\n   错误：{step.error}"
-                    
-            print(f"📄 [答案生成] 上下文长度: {len(context)} 字符")
-            
-            # 生成回答提示
-            answer_prompt = f"""
-基于以上执行的步骤和结果，请为用户提供一个清晰、详细的最终答案。
-
-要求：
-1. 用中文回答
-2. 总结执行的步骤
-3. 提供具体的结果或建议
-4. 如果有数据，请用易懂的方式呈现
-5. 如果有错误，请说明并提供解决建议
-
-请直接提供答案，不要重复问题。
-"""
-            
-            messages = [
-                {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": context + "\n\n" + answer_prompt}
+            # 检测幻觉模式：承诺未来调用工具的表述
+            hallucination_patterns = [
+                r'我将.*?调用',
+                r'稍后.*?工具',
+                r'接下来.*?使用',
+                r'后续.*?执行',
+                r'下一步.*?调用'
             ]
             
-            print("🧠 [答案生成] 正在调用LLM生成最终答案...")
-            print(f"📝 [答案生成] 消息数量: {len(messages)}")
-            print(f"📄 [答案生成] 总输入长度: {len(messages[0]['content']) + len(messages[1]['content'])} 字符")
+            for pattern in hallucination_patterns:
+                if re.search(pattern, text):
+                    print(f"🚨 检测到可能的工具调用幻觉模式: {pattern}")
+                    # 如果检测到幻觉模式但没有实际工具调用，返回None
+                    if '```json' not in text.lower():
+                        print("❌ 发现幻觉：承诺调用工具但未实际执行")
+                        return None
             
-            final_answer = await self._call_llm(messages)
-            print(f"✅ [答案生成] 最终答案生成完成，长度: {len(final_answer)} 字符")
-            print(f"📋 [答案生成] 答案预览: {final_answer[:100]}..." if len(final_answer) > 100 else f"📋 [答案生成] 完整答案: {final_answer}")
-            return final_answer
+            # 方法1: 查找 ```json 代码块，并修复双大括号问题
+            json_pattern = r'```json\s*\n?(.*?)\n?```'
+            matches = re.findall(json_pattern, text, re.DOTALL | re.IGNORECASE)
             
-        except Exception as error:
-            self.logger.error(f"生成最终答案失败: {error}")
-            return f"抱歉，生成答案时发生错误: {error}"
+            for match in matches:
+                try:
+                    # 修复双大括号问题
+                    cleaned_match = match.strip()
+                    # 将双大括号替换为单大括号
+                    cleaned_match = cleaned_match.replace('{{', '{').replace('}}', '}')
+                    print(f"🔧 清理后的JSON: {cleaned_match}")
+                    
+                    parsed = json.loads(cleaned_match)
+                    if "tool_call" in parsed:
+                        tool_call = parsed["tool_call"]
+                        if "name" in tool_call and "args" in tool_call:
+                            print(f"✅ 方法1成功提取工具调用: {tool_call}")
+                            return tool_call
+                except json.JSONDecodeError as e:
+                    print(f"❌ 方法1 JSON解析失败: {e}")
+                    continue
+            
+            # 方法2: 直接查找JSON对象，并修复双大括号
+            json_pattern2 = r'\{[^{}]*"tool_call"[^{}]*\}'
+            matches2 = re.findall(json_pattern2, text, re.DOTALL)
+            
+            for match in matches2:
+                try:
+                    # 修复双大括号问题
+                    cleaned_match = match.replace('{{', '{').replace('}}', '}')
+                    print(f"🔧 方法2清理后的JSON: {cleaned_match}")
+                    
+                    parsed = json.loads(cleaned_match)
+                    if "tool_call" in parsed:
+                        tool_call = parsed["tool_call"]
+                        if "name" in tool_call and "args" in tool_call:
+                            print(f"✅ 方法2成功提取工具调用: {tool_call}")
+                            return tool_call
+                except json.JSONDecodeError as e:
+                    print(f"❌ 方法2 JSON解析失败: {e}")
+                    continue
+            
+            # 方法3: 查找更复杂的JSON结构，支持双大括号
+            json_pattern3 = r'\{\{.*?"tool_call".*?\}\}|\{.*?"tool_call".*?\}'
+            matches3 = re.findall(json_pattern3, text, re.DOTALL)
+            
+            for match in matches3:
+                try:
+                    # 修复双大括号问题
+                    cleaned_match = match.strip().replace('{{', '{').replace('}}', '}')
+                    print(f"🔧 方法3清理后的JSON: {cleaned_match}")
+                    
+                    parsed = json.loads(cleaned_match)
+                    if "tool_call" in parsed:
+                        tool_call = parsed["tool_call"]
+                        if "name" in tool_call and "args" in tool_call:
+                            print(f"✅ 方法3成功提取工具调用: {tool_call}")
+                            return tool_call
+                except json.JSONDecodeError as e:
+                    print(f"❌ 方法3 JSON解析失败: {e}")
+                    continue
+            
+            # 方法4: 查找文本中提到的工具名称和参数
+            tool_name_pattern = r'调用工具\s+(\w+).*?参数.*?\{([^}]+)\}'
+            tool_matches = re.findall(tool_name_pattern, text, re.DOTALL)
+            
+            for tool_name, args_str in tool_matches:
+                try:
+                    # 尝试解析参数
+                    args_json = "{" + args_str + "}"
+                    args = json.loads(args_json)
+                    tool_call = {"name": tool_name, "args": args}
+                    print(f"✅ 方法4成功提取工具调用: {tool_call}")
+                    return tool_call
+                except json.JSONDecodeError as e:
+                    print(f"❌ 方法4 JSON解析失败: {e}")
+                    continue
+            
+            # 方法5: 查找特定的工具调用模式
+            specific_patterns = [
+                r'sqlite_describe_table.*?"table_name":\s*"([^"]+)"',
+                r'sqlite_list_tables',
+                r'sqlite_query.*?"query":\s*"([^"]+)"',
+                r'sqlite_insert_data.*?"table_name":\s*"([^"]+)"',
+                r'sqlite_get_schema'
+            ]
+            
+            for pattern in specific_patterns:
+                matches = re.findall(pattern, text, re.IGNORECASE)
+                if matches:
+                    if 'describe_table' in pattern:
+                        tool_call = {"name": "sqlite_describe_table", "args": {"table_name": matches[0]}}
+                        print(f"✅ 方法5成功提取工具调用: {tool_call}")
+                        return tool_call
+                    elif 'list_tables' in pattern:
+                        tool_call = {"name": "sqlite_list_tables", "args": {}}
+                        print(f"✅ 方法5成功提取工具调用: {tool_call}")
+                        return tool_call
+                    elif 'query' in pattern:
+                        tool_call = {"name": "sqlite_query", "args": {"query": matches[0]}}
+                        print(f"✅ 方法5成功提取工具调用: {tool_call}")
+                        return tool_call
+                    elif 'get_schema' in pattern:
+                        tool_call = {"name": "sqlite_get_schema", "args": {}}
+                        print(f"✅ 方法5成功提取工具调用: {tool_call}")
+                        return tool_call
+            
+            print("❌ 所有方法都未能提取到工具调用")
+            return None
+                
+        except Exception as e:
+            print(f"❌ 提取工具调用时出错: {e}")
+            return None
+    
+    def _format_tool_result(self, tool_result: Any) -> str:
+        """格式化工具执行结果"""
+        try:
+            # 如果是MCPToolResult对象，提取其内容
+            if hasattr(tool_result, 'content'):
+                if isinstance(tool_result.content, list) and len(tool_result.content) > 0:
+                    if hasattr(tool_result.content[0], 'text'):
+                        return tool_result.content[0].text
+                    else:
+                        return str(tool_result.content[0])
+                elif isinstance(tool_result.content, str):
+                    return tool_result.content
+                else:
+                    return str(tool_result.content)
+            
+            # 尝试JSON序列化
+            if isinstance(tool_result, (dict, list)):
+                return json.dumps(tool_result, ensure_ascii=False, indent=2)
+            
+            # 直接转换为字符串
+            return str(tool_result)
+                
+        except Exception as e:
+            return f"结果格式化失败: {e}"
     
     async def _call_llm(self, messages: List[Dict[str, str]]) -> str:
         """
@@ -415,10 +535,10 @@ class LLMService:
         """
         try:
             # 记录LLM请求
-            self.tool_service.mcp_client.add_logs(
-                {"messages": messages, "model": self.model, "llm_type": self.llm_type},
-                LogType.LLM_REQUEST
-            )
+            # self.tool_service.mcp_client.add_logs(
+            #     {"messages": messages, "model": self.model, "llm_type": self.llm_type},
+            #     LogType.LLM_REQUEST
+            # )
             
             print(f"🤖 调用LLM: {self.llm_type}/{self.model}")
             
@@ -426,7 +546,6 @@ class LLMService:
             response = chat_with_llm(messages, llmType=self.llm_type, model=self.model)
             
             # chat_with_llm返回的是JSON字符串，需要解析
-            import json
             try:
                 response_data = json.loads(response)
                 content = response_data.get("reply", response)
@@ -437,139 +556,53 @@ class LLMService:
             print(f"✅ LLM响应长度: {len(content)} 字符")
             
             # 记录LLM响应
-            self.tool_service.mcp_client.add_logs(
-                {"response": content[:500] + "..." if len(content) > 500 else content, "full_response": response},
-                LogType.LLM_RESPONSE
-            )
+            # self.tool_service.mcp_client.add_logs(
+            #     {"response": content[:500] + "..." if len(content) > 500 else content},
+            #     LogType.LLM_RESPONSE
+            # )
             
             return content
             
         except Exception as error:
             error_msg = f"LLM调用失败: {error}"
             print(f"❌ {error_msg}")
-            self.tool_service.mcp_client.add_logs(
-                {"error": str(error)},
-                LogType.LLM_ERROR
-            )
+            # self.tool_service.mcp_client.add_logs(
+            #     {"error": str(error)},
+            #     LogType.LLM_ERROR
+            # )
             raise error
     
-    async def process_user_input(self, user_input: str, conversation_history: Optional[List[Dict[str, Any]]] = None) -> LLMResponse:
+    async def simple_chat(self, user_input: str, conversation_history: Optional[List[Dict[str, Any]]] = None) -> str:
         """
-        处理用户输入的完整流程
+        简单聊天接口（非流式）
         
         Args:
             user_input: 用户输入
             conversation_history: 对话历史
             
         Returns:
-            完整的LLM响应
+            LLM回答
         """
         try:
-            # 1. 分析用户输入
-            task_decomposition = await self.analyze_user_input(user_input, conversation_history)
+            # 构建对话历史
+            messages = [{"role": "system", "content": self.base_system_prompt}]
             
-            # 2. 执行任务
-            response = await self.execute_task(task_decomposition, user_input)
+            # 添加历史对话
+            if conversation_history:
+                for msg in conversation_history[-5:]:  # 只保留最近5轮对话
+                    if msg.get("role") in ["user", "assistant"]:
+                        messages.append({
+                            "role": msg["role"],
+                            "content": msg["content"]
+                        })
             
+            # 添加当前用户输入
+            messages.append({"role": "user", "content": user_input})
+            
+            # 调用LLM
+            response = await self._call_llm(messages)
             return response
             
         except Exception as error:
-            self.logger.error(f"处理用户输入失败: {error}")
-            return LLMResponse(
-                content=f"处理请求时发生错误: {error}",
-                final_answer=f"抱歉，处理您的请求时发生了错误: {error}",
-                metadata={"error": str(error)}
-            )
-    
-    async def stream_response(self, user_input: str, conversation_history: Optional[List[Dict[str, Any]]] = None) -> AsyncGenerator[Dict[str, Any], None]:
-        """
-        流式响应用户输入
-        
-        Args:
-            user_input: 用户输入
-            conversation_history: 对话历史
-            
-        Yields:
-            流式响应数据
-        """
-        try:
-            # 发送开始信号
-            yield {"type": "start", "message": "开始处理您的请求..."}
-            
-            # 1. 分析用户输入
-            yield {"type": "analysis", "message": "正在分析您的问题..."}
-            task_decomposition = await self.analyze_user_input(user_input, conversation_history)
-            
-            yield {
-                "type": "decomposition",
-                "message": f"已拆解为 {len(task_decomposition.steps)} 个步骤",
-                "data": task_decomposition.dict()
-            }
-            
-            # 2. 执行步骤
-            executed_steps = []
-            tool_results = []
-            
-            for step in task_decomposition.steps:
-                yield {
-                    "type": "step_start",
-                    "message": f"执行步骤 {step.step_id}: {step.step_name}",
-                    "step": step.dict()
-                }
-                
-                step.status = "running"
-                
-                try:
-                    if step.tool_name:
-                        result = await self.tool_service.call_tool(step.tool_name, step.tool_args or {})
-                        step.result = self.tool_service.format_tool_result(result)
-                        tool_results.append({
-                            "step_id": step.step_id,
-                            "tool_name": step.tool_name,
-                            "result": step.result
-                        })
-                    else:
-                        step.result = {"message": "步骤完成"}
-                    
-                    step.status = "completed"
-                    
-                    yield {
-                        "type": "step_completed",
-                        "message": f"步骤 {step.step_id} 完成",
-                        "step": step.dict()
-                    }
-                    
-                except Exception as error:
-                    step.status = "failed"
-                    step.error = str(error)
-                    
-                    yield {
-                        "type": "step_failed",
-                        "message": f"步骤 {step.step_id} 失败: {error}",
-                        "step": step.dict()
-                    }
-                
-                executed_steps.append(step)
-            
-            # 3. 生成最终答案
-            yield {"type": "generating", "message": "正在生成最终答案..."}
-            final_answer = await self._generate_final_answer(user_input, executed_steps, tool_results)
-            
-            # 4. 发送完成信号
-            yield {
-                "type": "completed",
-                "message": "处理完成",
-                "final_answer": final_answer,
-                "metadata": {
-                    "steps_count": len(executed_steps),
-                    "tools_used": [step.tool_name for step in executed_steps if step.tool_name],
-                    "success_rate": len([s for s in executed_steps if s.status == "completed"]) / len(executed_steps) if executed_steps else 0
-                }
-            }
-            
-        except Exception as error:
-            yield {
-                "type": "error",
-                "message": f"处理过程中发生错误: {error}",
-                "error": str(error)
-            } 
+            self.logger.error(f"简单聊天失败: {error}")
+            return f"抱歉，处理您的请求时发生了错误: {error}" 

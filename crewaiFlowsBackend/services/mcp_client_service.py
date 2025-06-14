@@ -222,11 +222,11 @@ class MCPClientService:
                     env=None
                 )
                 
-                self.add_logs({
-                    "command": command,
-                    "args": args,
-                    "server_path": server_script_path
-                }, LogType.CONNECT_TO_SERVER)
+                # self.add_logs({
+                #     "command": command,
+                #     "args": args,
+                #     "server_path": server_script_path
+                # }, LogType.CONNECT_TO_SERVER)
                 
                 print(f"📡 连接到服务器: {command} {' '.join(args)}")
                 
@@ -320,7 +320,7 @@ class MCPClientService:
                 except NameError:
                     pass  # 变量未定义，跳过
                 
-                self.add_logs(log_data, LogType.GET_TOOLS_ERROR)
+                # self.add_logs(log_data, LogType.GET_TOOLS_ERROR)
                 
                 # 清理失败的连接
                 await self._cleanup_connection()
@@ -332,11 +332,8 @@ class MCPClientService:
             if self._session_context:
                 try:
                     # 使用更安全的清理方式，避免跨任务问题
-                    import asyncio
-                    current_task = asyncio.current_task()
-                    # 检查上下文是否可以安全退出
                     if hasattr(self._session_context, '__aexit__'):
-                        await asyncio.shield(self._session_context.__aexit__(None, None, None))
+                        await self._session_context.__aexit__(None, None, None)
                 except Exception as e:
                     print(f"清理session失败: {e}")
                 finally:
@@ -349,11 +346,8 @@ class MCPClientService:
             if self._connection_context:
                 try:
                     # 使用更安全的清理方式，避免跨任务问题
-                    import asyncio
-                    current_task = asyncio.current_task()
-                    # 检查上下文是否可以安全退出
                     if hasattr(self._connection_context, '__aexit__'):
-                        await asyncio.shield(self._connection_context.__aexit__(None, None, None))
+                        await self._connection_context.__aexit__(None, None, None)
                 except Exception as e:
                     print(f"清理connection失败: {e}")
                 finally:
@@ -382,25 +376,25 @@ class MCPClientService:
             tools_result = await self.client.list_tools()
             print(f"✅ [MCP工具获取] 成功获取 {len(tools_result.tools)} 个原始工具:")
             
-            for i, tool in enumerate(tools_result.tools, 1):
-                print(f"   {i}. {tool.name}: {tool.description}")
-                print(f"      输入参数结构: {json.dumps(tool.inputSchema, ensure_ascii=False, indent=2)}")
+            # for i, tool in enumerate(tools_result.tools, 1):
+            #     print(f"   {i}. {tool.name}: {tool.description}")
+            #     print(f"      输入参数结构: {json.dumps(tool.inputSchema, ensure_ascii=False, indent=2)}")
             
             log_info = [
                 {"name": tool.name, "description": tool.description}
                 for tool in tools_result.tools
             ]
-            self.add_logs(log_info, LogType.GET_TOOLS)
+            # self.add_logs(log_info, LogType.GET_TOOLS)
             
             # 转换为OpenAI工具格式
             print("🔄 [MCP工具获取] 正在转换为OpenAI工具格式...")
             openai_tools = []
             for tool in tools_result.tools:
-                print(f"🔧 [MCP工具获取] 转换工具: {tool.name}")
+                # print(f"🔧 [MCP工具获取] 转换工具: {tool.name}")
                 
                 # 修补schema数组
                 patched_schema = self._patch_schema_arrays(tool.inputSchema) if tool.inputSchema else {}
-                print(f"   修补后的schema: {json.dumps(patched_schema, ensure_ascii=False, indent=2)}")
+                # print(f"   修补后的schema: {json.dumps(patched_schema, ensure_ascii=False, indent=2)}")
                 
                 openai_tool = OpenAITool(
                     type="function",
@@ -411,7 +405,7 @@ class MCPClientService:
                     }
                 )
                 openai_tools.append(openai_tool)
-                print(f"   ✅ 转换完成")
+                # print(f"   ✅ 转换完成")
             
             print(f"🎉 [MCP工具获取] 成功转换 {len(openai_tools)} 个工具为OpenAI格式")
             return openai_tools
@@ -419,7 +413,7 @@ class MCPClientService:
         except Exception as error:
             error_msg = f"获取工具列表失败: {str(error)}"
             print(error_msg)
-            self.add_logs(error_msg, LogType.GET_TOOLS_ERROR)
+            # self.add_logs(error_msg, LogType.GET_TOOLS_ERROR)
             raise RuntimeError(error_msg)
     
     async def call_tool(self, tool_name: str, tool_args: Dict[str, Any]) -> MCPToolResult:
@@ -434,10 +428,10 @@ class MCPClientService:
         try:
             print("📞 [MCP工具调用] 正在调用 client.call_tool()...")
             
-            self.add_logs({
-                "name": tool_name,
-                "arguments": tool_args
-            }, LogType.TOOL_CALL)
+            # self.add_logs({
+            #     "name": tool_name,
+            #     "arguments": tool_args
+            # }, LogType.TOOL_CALL)
             
             # 执行工具调用
             result = await self.client.call_tool(tool_name, tool_args)
@@ -454,8 +448,8 @@ class MCPClientService:
                 else:
                     print(f"📄 [MCP工具调用] 内容详情: {result.content}")
             
-            self.add_logs(result.__dict__ if hasattr(result, '__dict__') else str(result), 
-                         LogType.TOOL_CALL_RESPONSE)
+            # self.add_logs(result.__dict__ if hasattr(result, '__dict__') else str(result), 
+            #              LogType.TOOL_CALL_RESPONSE)
             
             mcp_result = MCPToolResult(content=result.content)
             print(f"✅ [MCP工具调用] 工具调用成功完成")
@@ -465,7 +459,7 @@ class MCPClientService:
             error_msg = f"调用工具 {tool_name} 失败: {str(error)}"
             print(f"❌ [MCP工具调用] {error_msg}")
             print(f"🔍 [MCP工具调用] 错误详情: {type(error).__name__}: {str(error)}")
-            self.add_logs(error_msg, LogType.TOOL_CALL_ERROR)
+            # self.add_logs(error_msg, LogType.TOOL_CALL_ERROR)
             raise RuntimeError(error_msg)
     
     def is_connected(self) -> bool:

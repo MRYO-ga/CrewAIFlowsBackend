@@ -16,14 +16,19 @@ async def save_chat_message():
 # chat API路由模块 - 处理智能对话和优化相关的API接口
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
+import json
 from utils.myLLM import interact_with_intent_agent
 from utils.smart_data_manager import smart_data_manager
 
+# 创建全局聊天服务实例
+from services.chat_service import ChatService
+chat_service = ChatService()
+
 # 创建路由器
 chat_router = APIRouter(prefix="/api", tags=["chat"])
-
 
 # 定义对话请求模型
 class ChatRequest(BaseModel):
@@ -43,44 +48,33 @@ class OptimizationRequest(BaseModel):
 
 @chat_router.post("/chat")
 async def chat_with_agent(request: ChatRequest):
-    """智能聊天接口，集成MCP工具调用和任务拆解功能"""
+    """简单聊天接口（非流式）"""
     try:
-        print(f"收到聊天请求，用户ID: {request.user_id}")
+        print(f"收到非流式聊天请求，用户ID: {request.user_id}")
         print(f"用户输入: {request.user_input}")
         
-        # 使用新的聊天服务
-        from services.chat_service import ChatService
-        
-        chat_service = ChatService()
-        
-        # 处理用户消息
-        response = await chat_service.process_message(
+        response = await chat_service.simple_chat(
             user_input=request.user_input,
             user_id=request.user_id,
             conversation_history=request.conversation_history
         )
         
-        # 转换为API响应格式
-        result = {
+        return {
             "status": "success",
-            "message": "处理完成",
-            "final_answer": response.final_answer,
+            "reply": response,
+            "final_answer": response,
             "data": {
-                "task_decomposition": response.task_decomposition.dict() if response.task_decomposition else None,
-                "steps_executed": [step.dict() for step in response.steps_executed],
-                "metadata": response.metadata,
-                "tools_used": response.metadata.get("tools_used", [])
+                "type": "simple_chat"
             }
         }
         
-        print(f"处理完成，步骤数: {response.metadata.get('steps_count', 0)}")
-        print(f"使用的工具: {response.metadata.get('tools_used', [])}")
-        
-        return result
-        
     except Exception as e:
-        print(f"对话处理出错: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"非流式聊天处理出错: {str(e)}")
+        return {
+            "status": "error",
+            "reply": f"抱歉，处理您的请求时发生了错误: {str(e)}",
+            "error": str(e)
+        }
 
 
 # @chat_router.post("/optimize")
@@ -139,38 +133,39 @@ async def get_user_context(user_id: str, data_type: str = "all"):
 
 @chat_router.post("/chat/stream")
 async def stream_chat_with_agent(request: ChatRequest):
-    """流式聊天接口，实时展示任务执行步骤"""
-    from fastapi.responses import StreamingResponse
-    from services.chat_service import ChatService
-    import json
+    """流式聊天接口，实时展示对话过程"""
     
     async def generate_stream():
         try:
-            chat_service = ChatService()
+            print(f"收到流式聊天请求，用户ID: {request.user_id}")
+            print(f"用户输入: {request.user_input}")
             
-            async for chunk in chat_service.stream_message(
+            async for chunk in chat_service.process_message_stream(
                 user_input=request.user_input,
                 user_id=request.user_id,
                 conversation_history=request.conversation_history
             ):
-                # 将数据转换为JSON格式并发送
+                # 发送服务器发送事件格式
                 yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
                 
         except Exception as e:
             error_chunk = {
                 "type": "error",
-                "message": f"流式处理出错: {str(e)}",
-                "error": str(e)
+                "content": f"流式处理出错: {str(e)}",
+                "data": {"error": str(e)},
+                "timestamp": ""
             }
             yield f"data: {json.dumps(error_chunk, ensure_ascii=False)}\n\n"
     
     return StreamingResponse(
         generate_stream(),
-        media_type="text/plain",
+        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "Content-Type": "text/event-stream"
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type"
         }
     )
 
@@ -181,26 +176,23 @@ async def analyze_user_request(request: ChatRequest):
         print(f"分析用户请求，用户ID: {request.user_id}")
         print(f"用户输入: {request.user_input}")
         
-        from services.chat_service import ChatService
+        # 使用全局的chat_service实例，不要创建新的
+        # 分析用户请求 (这个方法可能需要添加到ChatService中)
+        # task_decomposition = await chat_service.analyze_user_request(request.user_input)
         
-        chat_service = ChatService()
-        
-        # 分析用户请求
-        task_decomposition = await chat_service.analyze_user_request(request.user_input)
-        
+        # 暂时返回简单响应，因为analyze_user_request方法可能不存在
         result = {
             "status": "success",
-            "message": "分析完成",
+            "message": "分析功能开发中",
             "data": {
-                "task_decomposition": task_decomposition.dict(),
-                "estimated_steps": len(task_decomposition.steps),
-                "requires_tools": task_decomposition.requires_tools,
-                "tool_names": task_decomposition.tool_names
+                "task_decomposition": {"steps": [], "requires_tools": False, "tool_names": []},
+                "estimated_steps": 0,
+                "requires_tools": False,
+                "tool_names": []
             }
         }
         
-        print(f"分析完成，拆解为 {len(task_decomposition.steps)} 个步骤")
-        print(f"需要工具: {task_decomposition.requires_tools}")
+        print("分析功能开发中")
         
         return result
         
@@ -208,64 +200,102 @@ async def analyze_user_request(request: ChatRequest):
         print(f"分析请求出错: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@chat_router.get("/chat/tools")
-async def get_available_tools():
-    """获取当前可用的工具列表"""
+@chat_router.get("/chat/mcp-status")
+async def get_mcp_status():
+    """获取MCP连接状态和可用工具"""
     try:
-        from services.chat_service import ChatService
-        from services.mcp_server_manager import mcp_server_manager
-        
-        chat_service = ChatService()
-        tools = await chat_service.get_available_tools()
-        
-        # 获取当前连接的服务器信息
-        current_server = mcp_server_manager.get_current_server()
-        
+        status = await chat_service.get_mcp_status()
         return {
             "status": "success",
-            "message": "获取工具列表成功",
+            "data": status
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
             "data": {
-                "tools": tools,
-                "count": len(tools),
-                "current_server": {
-                    "name": current_server.name if current_server else None,
-                    "description": current_server.description if current_server else None,
-                    "tools_count": current_server.tools_count if current_server else 0,
-                    "status": current_server.status.value if current_server else "unknown"
-                }
+                "connected": False,
+                "tools_count": 0,
+                "tools": []
             }
         }
-        
+
+@chat_router.post("/chat/mcp-reconnect")
+async def reconnect_mcp():
+    """重新连接MCP服务器"""
+    try:
+        success = await chat_service.reconnect_mcp()
+        if success:
+            status = await chat_service.get_mcp_status()
+            return {
+                "status": "success",
+                "message": "MCP重新连接成功",
+                "data": status
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "MCP重新连接失败",
+                "data": {
+                    "connected": False,
+                    "tools_count": 0,
+                    "tools": []
+                }
+            }
     except Exception as e:
-        print(f"获取工具列表出错: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "status": "error",
+            "message": f"MCP重新连接失败: {str(e)}",
+            "error": str(e)
+        }
+
+# 兼容性接口 - 保持原有API接口
+@chat_router.get("/chat/tools")
+async def get_available_tools():
+    """获取可用工具列表（兼容性接口）"""
+    try:
+        status = await chat_service.get_mcp_status()
+        return {
+            "status": "success",
+            "tools": status.get("tools", []),
+            "count": status.get("tools_count", 0)
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "tools": [],
+            "count": 0
+        }
 
 @chat_router.get("/chat/context/{user_id}")
 async def get_chat_context(user_id: str):
-    """获取用户的聊天上下文"""
+    """获取聊天上下文（兼容性接口）"""
     try:
-        from services.chat_service import ChatService
-        
-        chat_service = ChatService()
-        context = await chat_service.get_chat_context(user_id)
-        
+        status = await chat_service.get_mcp_status()
         return {
             "status": "success",
-            "message": "获取聊天上下文成功",
-            "data": context
+            "user_id": user_id,
+            "context": {
+                "mcp_connected": status.get("connected", False),
+                "available_tools": status.get("tools", []),
+                "tools_count": status.get("tools_count", 0)
+            }
         }
-        
     except Exception as e:
-        print(f"获取聊天上下文出错: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "status": "error",
+            "error": str(e),
+            "context": {}
+        }
 
+# 占位符接口
 @chat_router.get("/chat/history")
 async def get_chat_history():
-    """获取聊天历史"""
+    """获取聊天历史（待实现）"""
     return {"message": "聊天历史功能开发中"}
-
 
 @chat_router.post("/chat/save")
 async def save_message():
-    """保存聊天消息"""
-    return {"message": "聊天消息保存功能开发中"} 
+    """保存聊天消息（待实现）"""
+    return {"message": "消息保存功能开发中"} 

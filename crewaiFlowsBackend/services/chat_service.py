@@ -1,118 +1,65 @@
 """
-聊天服务模块
-整合MCP客户端、工具服务和LLM服务，提供完整的智能对话功能
+简化的聊天服务
+负责处理聊天流程，自动连接MCP，并提供流式输出
 """
 
 import asyncio
 import json
 import logging
 from typing import Dict, List, Any, Optional, AsyncGenerator
+from datetime import datetime
 from pathlib import Path
 
-from .mcp_client_service import MCPClientService, mcp_client_service
-from .mcp_server_manager import mcp_server_manager
+from .llm_service import LLMService, StreamChunk
 from .tool_service import ToolService
-from .llm_service import LLMService, LLMResponse, TaskDecomposition
+from .mcp_client_service import mcp_client_service  # 使用全局实例
+from .mcp_server_manager import mcp_server_manager
 
 class ChatService:
-    """聊天服务类"""
+    """简化的聊天服务类"""
     
     def __init__(self):
         """初始化聊天服务"""
         self.logger = logging.getLogger(__name__)
-        # 使用全局的MCP客户端服务，而不是创建新的
+        
+        # 使用全局MCP客户端实例（与MCPServerManager使用同一个）
         self.mcp_client = mcp_client_service
-        self.tool_service = None
-        self.llm_service = None
-        self._initialized = False
-    
-    async def initialize(self, openai_api_key: str = None, model: str = "gpt-4o-mini"):
-        """
-        初始化聊天服务
         
-        Args:
-            openai_api_key: OpenAI API密钥
-            model: 使用的LLM模型
-        """
-        try:
-            if self._initialized:
-                return
-            
-            self.logger.info("正在初始化聊天服务...")
-            
-            # 1. 检查是否已有MCP连接，如果没有则自动连接
-            if not self.mcp_client.is_connected():
-                self.logger.info("MCP未连接，尝试自动连接到最佳服务器...")
-                success = await mcp_server_manager.auto_connect_best_server()
-                if not success:
-                    self.logger.warning("自动连接MCP服务器失败，聊天功能可能受限")
-            else:
-                current_server = mcp_server_manager.get_current_server()
-                self.logger.info(f"使用已连接的MCP服务器: {current_server.name if current_server else '未知'}")
-            
-            # 2. 初始化工具服务
-            self.tool_service = ToolService(self.mcp_client)
-            
-            # 3. 初始化LLM服务，使用配置好的LLM类型
-            self.llm_service = LLMService(
-                self.tool_service, 
-                openai_api_key, 
-                model, 
-                llm_type="openai"  # 使用myLLM.py中配置的代理服务
-            )
-            
-            self._initialized = True
-            self.logger.info("聊天服务初始化完成")
-            
-        except Exception as error:
-            self.logger.error(f"初始化聊天服务失败: {error}")
-            raise error
-    
-
-    
-    async def process_message(self, user_input: str, user_id: str = "default", conversation_history: Optional[List[Dict[str, Any]]] = None) -> LLMResponse:
-        """
-        处理用户消息
+        # 初始化工具服务
+        self.tool_service = ToolService(self.mcp_client)
         
-        Args:
-            user_input: 用户输入
-            user_id: 用户ID
-            conversation_history: 对话历史
-            
-        Returns:
-            LLM响应结果
-        """
-        try:
-            if not self._initialized:
-                await self.initialize()
-            
-            self.logger.info(f"处理用户 {user_id} 的消息: {user_input}")
-            
-            # 检查MCP连接状态
-            current_server = mcp_server_manager.get_current_server()
-            if current_server:
-                self.logger.info(f"使用MCP服务器: {current_server.name}")
-            else:
-                self.logger.warning("没有可用的MCP服务器")
-            
-            # 处理用户输入
-            response = await self.llm_service.process_user_input(user_input, conversation_history)
-            
-            # 添加用户ID到元数据
-            response.metadata["user_id"] = user_id
-            response.metadata["timestamp"] = response.metadata.get("execution_time")
-            
-            return response
-            
-        except Exception as error:
-            self.logger.error(f"处理用户消息失败: {error}")
-            return LLMResponse(
-                content=f"处理消息时发生错误: {error}",
-                final_answer=f"抱歉，处理您的消息时发生了错误: {error}",
-                metadata={"error": str(error), "user_id": user_id}
-            )
+        # 初始化LLM服务
+        self.llm_service = LLMService(self.tool_service)
+        
+        # MCP连接状态标志
+        self._mcp_initialized = False
+        
+        print("🎉 聊天服务初始化完成")
     
-    async def stream_message(self, user_input: str, user_id: str = "default", conversation_history: Optional[List[Dict[str, Any]]] = None) -> AsyncGenerator[Dict[str, Any], None]:
+    async def _ensure_mcp_connected(self):
+        """确保MCP已连接（延迟初始化）"""
+        if not self._mcp_initialized:
+            await self._auto_connect_mcp()
+            self._mcp_initialized = True
+    
+    async def _auto_connect_mcp(self):
+        """自动连接MCP服务器"""
+        try:
+            print("🔌 开始自动连接MCP服务器...")
+            
+            # 使用MCPServerManager进行自动连接
+            success = await mcp_server_manager.auto_connect_best_server()
+            
+            if success:
+                print("✅ MCP服务器自动连接成功")
+            else:
+                print("❌ MCP服务器自动连接失败")
+            
+        except Exception as e:
+            print(f"❌ 自动连接MCP服务器失败: {e}")
+    
+    async def process_message_stream(self, user_input: str, user_id: str = "default", 
+                                   conversation_history: Optional[List[Dict[str, Any]]] = None) -> AsyncGenerator[Dict[str, Any], None]:
         """
         流式处理用户消息
         
@@ -125,144 +72,87 @@ class ChatService:
             流式响应数据
         """
         try:
-            if not self._initialized:
-                await self.initialize()
+            print(f"📨 收到用户消息: {user_input[:50]}...")
             
-            self.logger.info(f"流式处理用户 {user_id} 的消息: {user_input}")
+            # 确保MCP已连接
+            await self._ensure_mcp_connected()
             
-            # 检查MCP连接状态
-            current_server = mcp_server_manager.get_current_server()
-            if current_server:
-                self.logger.info(f"使用MCP服务器: {current_server.name}")
-            
-            # 流式处理用户输入
-            async for chunk in self.llm_service.stream_response(user_input, conversation_history):
-                # 添加用户ID到每个块
-                chunk["user_id"] = user_id
-                yield chunk
+            # 开始流式处理
+            async for chunk in self.llm_service.process_message_stream(user_input, conversation_history):
+                # 转换为API响应格式
+                yield {
+                    "type": chunk.type,
+                    "content": chunk.content,
+                    "data": chunk.data,
+                    "timestamp": chunk.timestamp
+                }
                 
         except Exception as error:
-            self.logger.error(f"流式处理用户消息失败: {error}")
+            self.logger.error(f"流式处理消息失败: {error}")
             yield {
                 "type": "error",
-                "message": f"处理消息时发生错误: {error}",
-                "error": str(error),
-                "user_id": user_id
+                "content": f"处理消息时发生错误: {error}",
+                "data": {"error": str(error)},
+                "timestamp": datetime.now().isoformat()
             }
     
-
-    
-    async def get_available_tools(self) -> List[Dict[str, Any]]:
+    async def simple_chat(self, user_input: str, user_id: str = "default", 
+                         conversation_history: Optional[List[Dict[str, Any]]] = None) -> str:
         """
-        获取当前可用的工具列表
-        
-        Returns:
-            工具列表
-        """
-        try:
-            if not self._initialized:
-                await self.initialize()
-            
-            return await self.tool_service.get_tools_for_llm()
-            
-        except Exception as error:
-            self.logger.error(f"获取工具列表失败: {error}")
-            return []
-    
-    async def get_chat_context(self, user_id: str) -> Dict[str, Any]:
-        """
-        获取用户的聊天上下文
-        
-        Args:
-            user_id: 用户ID
-            
-        Returns:
-            聊天上下文信息
-        """
-        try:
-            if not self._initialized:
-                await self.initialize()
-            
-            # 获取可用工具
-            tools = await self.get_available_tools()
-            
-            # 构建上下文
-            context = {
-                "user_id": user_id,
-                "available_tools": tools,
-                "mcp_servers": list(self.mcp_servers.keys()),
-                "current_server": getattr(self.mcp_client, "_last_connection_path", None),
-                "initialized": self._initialized
-            }
-            
-            return context
-            
-        except Exception as error:
-            self.logger.error(f"获取聊天上下文失败: {error}")
-            return {"error": str(error)}
-    
-    async def analyze_user_request(self, user_input: str) -> TaskDecomposition:
-        """
-        分析用户请求
+        简单聊天接口（非流式）
         
         Args:
             user_input: 用户输入
+            user_id: 用户ID
+            conversation_history: 对话历史
             
         Returns:
-            任务拆解结果
+            LLM回答
         """
         try:
-            if not self._initialized:
-                await self.initialize()
+            # 确保MCP已连接
+            await self._ensure_mcp_connected()
             
-            # 根据用户输入选择服务器
-            await self._select_mcp_server(user_input)
-            
-            # 分析用户输入
-            return await self.llm_service.analyze_user_input(user_input)
+            response = await self.llm_service.simple_chat(user_input, conversation_history)
+            return response
             
         except Exception as error:
-            self.logger.error(f"分析用户请求失败: {error}")
-            # 返回简单的错误任务拆解
-            from .llm_service import TaskType, TaskStep
-            return TaskDecomposition(
-                task_type=TaskType.SIMPLE_QUERY,
-                task_description=f"分析失败: {error}",
-                steps=[TaskStep(
-                    step_id=1,
-                    step_name="错误处理",
-                    step_description=f"处理错误: {error}",
-                    tool_name=None,
-                    tool_args=None
-                )],
-                requires_tools=False,
-                tool_names=[]
-            )
+            self.logger.error(f"简单聊天失败: {error}")
+            return f"抱歉，处理您的请求时发生了错误: {error}"
     
-    async def close(self):
-        """关闭聊天服务"""
+    async def get_mcp_status(self) -> Dict[str, Any]:
+        """获取MCP连接状态"""
         try:
-            if self.llm_service:
-                # LLM服务没有特定的关闭方法
-                pass
+            # 确保MCP已连接
+            await self._ensure_mcp_connected()
             
-            if self.tool_service:
-                await self.tool_service.close()
+            is_connected = self.mcp_client.is_connected()
+            tools = await self.tool_service.get_tools_for_llm() if is_connected else []
             
-            if self.mcp_client:
-                await self.mcp_client.close()
+            return {
+                "connected": is_connected,
+                "tools_count": len(tools),
+                "tools": [{"name": t["name"], "description": t["description"]} for t in tools]
+            }
             
-            self._initialized = False
-            self.logger.info("聊天服务已关闭")
-            
-        except Exception as error:
-            self.logger.error(f"关闭聊天服务失败: {error}")
+        except Exception as e:
+            self.logger.error(f"获取MCP状态失败: {e}")
+            return {
+                "connected": False,
+                "tools_count": 0,
+                "tools": [],
+                "error": str(e)
+            }
     
-    def __del__(self):
-        """析构函数"""
-        if self._initialized:
-            try:
-                # 异步关闭服务
-                asyncio.create_task(self.close())
-            except:
-                pass 
+    async def reconnect_mcp(self) -> bool:
+        """重新连接MCP服务器"""
+        try:
+            print("🔄 重新连接MCP服务器...")
+            # 重置初始化标志，强制重新连接
+            self._mcp_initialized = False
+            await self._ensure_mcp_connected()
+            return self.mcp_client.is_connected()
+            
+        except Exception as e:
+            self.logger.error(f"重新连接MCP失败: {e}")
+            return False 
