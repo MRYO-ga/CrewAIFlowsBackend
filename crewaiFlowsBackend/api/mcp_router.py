@@ -10,6 +10,7 @@ import asyncio
 import os
 
 from services.mcp_client_service import mcp_client_service, MCPClientService
+from services.multi_mcp_client_service import multi_mcp_client_service, MultiMCPClientService
 from services.mcp_server_manager import mcp_server_manager, MCPServerManager, MCPServerInfo, ServerStatus
 
 router = APIRouter(prefix="/api/mcp", tags=["MCP客户端"])
@@ -63,6 +64,14 @@ class ConnectServerByNameRequest(BaseModel):
     server_name: str
 
 
+class MultiConnectResponse(BaseModel):
+    """多服务器连接响应模型"""
+    success: bool
+    message: str
+    connected_servers: List[str]
+    total_servers: int
+
+
 def _get_fallback_tools():
     """获取后备工具列表（硬编码）"""
     return [
@@ -109,8 +118,167 @@ def _get_fallback_tools():
 
 def get_mcp_service() -> MCPClientService:
     """获取MCP客户端服务实例"""
-    # 使用全局单例实例，保持连接状态
     return mcp_client_service
+
+
+def get_multi_mcp_service() -> MultiMCPClientService:
+    """获取多服务器MCP客户端服务实例"""
+    return multi_mcp_client_service
+
+
+@router.post("/multi-connect", response_model=MultiConnectResponse)
+async def connect_to_all_servers(
+    multi_mcp_service: MultiMCPClientService = Depends(get_multi_mcp_service)
+):
+    """
+    连接到所有活跃的MCP服务器
+    
+    Returns:
+        MultiConnectResponse: 连接结果
+    """
+    try:
+        success = await multi_mcp_service.connect_to_all_servers()
+        connected_servers = multi_mcp_service.get_connected_servers()
+        
+        if success:
+            return MultiConnectResponse(
+                success=True,
+                message=f"成功连接到 {len(connected_servers)} 个MCP服务器",
+                connected_servers=connected_servers,
+                total_servers=len(connected_servers)
+            )
+        else:
+            return MultiConnectResponse(
+                success=False,
+                message="未能连接到任何MCP服务器",
+                connected_servers=[],
+                total_servers=0
+            )
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"连接服务器时发生错误: {str(e)}")
+
+
+@router.get("/multi-tools", response_model=ToolsResponse)
+async def get_multi_server_tools(
+    multi_mcp_service: MultiMCPClientService = Depends(get_multi_mcp_service)
+):
+    """
+    获取所有连接服务器的工具列表
+    
+    Returns:
+        ToolsResponse: 工具列表
+    """
+    try:
+        print(f"检查多服务器MCP连接状态: {multi_mcp_service.is_connected()}")
+        
+        # 如果没有连接，尝试自动连接
+        if not multi_mcp_service.is_connected():
+            print("🔄 尝试自动连接到所有MCP服务器...")
+            success = await multi_mcp_service.connect_to_all_servers()
+            if not success:
+                return ToolsResponse(
+                    tools=[],
+                    total=0
+                )
+        
+        # 获取工具列表
+        tools = await multi_mcp_service.get_tools()
+        
+        # 转换为字典格式
+        tools_dict = [
+            {
+                "type": tool.type,
+                "function": tool.function
+            }
+            for tool in tools
+        ]
+        
+        print(f"✅ 成功获取 {len(tools_dict)} 个工具")
+        return ToolsResponse(
+            tools=tools_dict,
+            total=len(tools_dict)
+        )
+        
+    except Exception as e:
+        print(f"❌ 获取工具列表失败: {str(e)}")
+        return ToolsResponse(
+            tools=[],
+            total=0
+        )
+
+
+@router.post("/multi-tools/call", response_model=ToolCallResponse)
+async def call_multi_server_tool(
+    request: ToolCallRequest,
+    multi_mcp_service: MultiMCPClientService = Depends(get_multi_mcp_service)
+):
+    """
+    调用多服务器环境中的工具
+    
+    Args:
+        request: 工具调用请求参数
+        
+    Returns:
+        ToolCallResponse: 工具调用结果
+    """
+    try:
+        if not multi_mcp_service.is_connected():
+            raise HTTPException(status_code=400, detail="未连接到任何MCP服务器")
+        
+        result = await multi_mcp_service.call_tool(request.tool_name, request.tool_args)
+        
+        return ToolCallResponse(
+            success=True,
+            result=result.content,
+            message=f"成功调用工具: {request.tool_name}"
+        )
+        
+    except Exception as e:
+        return ToolCallResponse(
+            success=False,
+            result=None,
+            message=f"调用工具失败: {str(e)}"
+        )
+
+
+@router.get("/multi-status")
+async def get_multi_connection_status(
+    multi_mcp_service: MultiMCPClientService = Depends(get_multi_mcp_service)
+):
+    """
+    获取多服务器连接状态
+    
+    Returns:
+        Dict: 连接状态信息
+    """
+    connected_servers = multi_mcp_service.get_connected_servers()
+    return {
+        "connected": multi_mcp_service.is_connected(),
+        "connected_servers": connected_servers,
+        "total_connected": len(connected_servers),
+        "connection_details": multi_mcp_service.connected_servers
+    }
+
+
+@router.post("/multi-disconnect")
+async def disconnect_from_all_servers(
+    multi_mcp_service: MultiMCPClientService = Depends(get_multi_mcp_service)
+):
+    """
+    断开所有MCP服务器连接
+    
+    Returns:
+        Dict: 断开连接结果
+    """
+    try:
+        await multi_mcp_service.close()
+        return {
+            "success": True,
+            "message": "已断开所有MCP服务器连接"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"断开连接时发生错误: {str(e)}")
 
 
 @router.post("/connect", response_model=ServerConnectionResponse)
@@ -186,60 +354,41 @@ async def get_available_tools(
             try:
                 success = await mcp_server_manager.auto_connect_best_server()
                 if not success:
-                    # 连接失败，使用硬编码的工具列表作为后备方案
-                    print("⚠️ 自动连接失败，使用硬编码工具列表作为后备方案")
                     return ToolsResponse(
-                        tools=_get_fallback_tools(),
-                        total=len(_get_fallback_tools())
+                        tools=[],
+                        total=0
                     )
             except Exception as connect_error:
-                import traceback
-                error_details = traceback.format_exc()
-                print(f"❌ 自动连接过程中出现异常:")
-                print(f"异常类型: {type(connect_error).__name__}")
-                print(f"异常消息: {str(connect_error)}")
-                print(f"完整堆栈:")
-                print(error_details)
-                
-                # 连接异常，使用硬编码的工具列表作为后备方案
-                print("⚠️ 自动连接异常，使用硬编码工具列表作为后备方案")
+                print(f"❌ 自动连接失败: {str(connect_error)}")
                 return ToolsResponse(
-                    tools=_get_fallback_tools(),
-                    total=len(_get_fallback_tools())
-                )
-            else:
-                print("⚠️ 天气服务器文件不存在，使用硬编码工具列表作为后备方案")
-                return ToolsResponse(
-                    tools=_get_fallback_tools(),
-                    total=len(_get_fallback_tools())
+                    tools=[],
+                    total=0
                 )
         
-        print("尝试获取工具列表...")
+        # 获取工具列表
         tools = await mcp_service.get_tools()
-        print(f"获取到工具数量: {len(tools)}")
         
         # 转换为字典格式
-        tools_data = []
-        for tool in tools:
-            tools_data.append({
+        tools_dict = [
+            {
                 "type": tool.type,
                 "function": tool.function
-            })
+            }
+            for tool in tools
+        ]
         
-        print(f"成功转换工具数据: {len(tools_data)}")
+        print(f"✅ 成功获取 {len(tools_dict)} 个工具")
         return ToolsResponse(
-            tools=tools_data,
-            total=len(tools_data)
+            tools=tools_dict,
+            total=len(tools_dict)
         )
         
-    except RuntimeError as e:
-        print(f"运行时错误: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        print(f"未知错误: {str(e)}")
-        import traceback
-        print(f"错误堆栈: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"获取工具列表时发生错误: {str(e)}")
+        print(f"❌ 获取工具列表失败: {str(e)}")
+        return ToolsResponse(
+            tools=[],
+            total=0
+        )
 
 
 @router.post("/tools/call", response_model=ToolCallResponse)

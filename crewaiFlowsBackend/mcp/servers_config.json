@@ -1,24 +1,20 @@
 {
-  "servers": {
-    "sqlite_final": {
-      "auto_connect": true,
-      "priority": 0,
-      "description": "最终版SQLite MCP服务器 - 功能完整且稳定",
-      "disabled": false,
-      "tools_count": 5,
-      "last_connected": "2025-06-14T17:38:27.517972",
-      "status": "connected",
-      "error_message": null
-    },
-    "weather": {
-      "auto_connect": true,
-      "priority": 2,
-      "description": "天气预报MCP服务器 提供美国各州天气警报和预报功能",
-      "disabled": false,
-      "tools_count": 2,
-      "last_connected": "2025-06-14T13:12:26.268900",
-      "status": "available",
-      "error_message": null
-    }
+  "xhs-mcp": {
+    "script": "D:/app/CrewAIFlowsFullStack/crewaiFlowsBackend/mcp/xhs-mcp/main.py",
+    "encoding_error_handler": "ignore",
+    "description": "小红书MCP服务，提供小红书平台的搜索、获取笔记内容、评论等功能。支持关键词搜索笔记、获取笔记详细内容、查看评论、发布评论等操作。",
+    "required_env_vars": [],
+    "active": true
+  },
+  "sqlite_final": {
+    "script": "D:/app/CrewAIFlowsFullStack/crewaiFlowsBackend/mcp/sqlite_final.py",
+    "encoding_error_handler": "ignore",
+    "description": "最终版SQLite MCP服务器 - 功能完整且稳定，提供数据库查询、表管理、数据分析等功能。",
+    "required_env_vars": [],
+    "active": true
+  },
+  "settings": {
+    "model": "gpt-4o",
+    "system_prompt_path": ""
   }
 }

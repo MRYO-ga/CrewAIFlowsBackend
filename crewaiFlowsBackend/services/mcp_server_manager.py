@@ -48,37 +48,47 @@ class MCPServerManager:
         self.current_server: Optional[str] = None
         self.mcp_directory = Path(__file__).parent.parent / "mcp"
         self.config_file = self.mcp_directory / "servers_config.json"
-        self._discover_servers()
+        # 先加载配置文件中的服务器
         self._load_config()
+        # 然后扫描目录补充发现其他服务器
+        self._discover_servers()
     
     def _discover_servers(self):
-        """自动发现MCP目录中的服务器"""
-        print(f"🔍 扫描MCP服务器目录: {self.mcp_directory}")
+        """自动发现MCP目录中的服务器（作为配置文件的补充）"""
+        print(f"🔍 补充扫描MCP服务器目录: {self.mcp_directory}")
         
         if not self.mcp_directory.exists():
             print(f"❌ MCP目录不存在: {self.mcp_directory}")
             return
         
+        discovered_count = 0
+        
         # 扫描Python服务器
-        for py_file in self.mcp_directory.glob("*.py"):
+        for py_file in self.mcp_directory.glob("**/main.py"):  # 支持子目录
             if py_file.name.startswith("__"):
                 continue
             
-            server_info = self._analyze_python_server(py_file)
+            # 排除虚拟环境和包目录
+            path_parts = py_file.parts
+            if any(part in ['.venv', 'venv', 'site-packages', 'node_modules', '__pycache__'] for part in path_parts):
+                continue
+            
+            # 从路径获取服务器名称（使用父目录名）
+            server_name = py_file.parent.name
+            
+            # 如果配置文件中已经有这个服务器，跳过
+            if server_name in self.servers:
+                continue
+            
+            server_info = self._analyze_python_server(py_file, server_name)
             if server_info:
                 self.servers[server_info.name] = server_info
-                print(f"✅ 发现Python MCP服务器: {server_info.name}")
+                print(f"✅ 发现新的Python MCP服务器: {server_info.name}")
+                discovered_count += 1
         
-        # 扫描JavaScript服务器
-        for js_file in self.mcp_directory.glob("*.js"):
-            server_info = self._analyze_javascript_server(js_file)
-            if server_info:
-                self.servers[server_info.name] = server_info
-                print(f"✅ 发现JavaScript MCP服务器: {server_info.name}")
-        
-        print(f"🎯 总共发现 {len(self.servers)} 个MCP服务器")
+        print(f"🎯 补充发现 {discovered_count} 个新MCP服务器")
     
-    def _analyze_python_server(self, file_path: Path) -> Optional[MCPServerInfo]:
+    def _analyze_python_server(self, file_path: Path, server_name: str = None) -> Optional[MCPServerInfo]:
         """分析Python MCP服务器文件"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -86,7 +96,7 @@ class MCPServerManager:
             
             # 简单的启发式分析
             if 'mcp.server' in content or 'FastMCP' in content or 'Server(' in content:
-                name = file_path.stem
+                name = server_name or file_path.stem
                 description = self._extract_description(content)
                 
                 return MCPServerInfo(
@@ -94,7 +104,9 @@ class MCPServerManager:
                     description=description,
                     script_path=str(file_path.absolute()),
                     script_type="python",
-                    status=ServerStatus.AVAILABLE
+                    status=ServerStatus.AVAILABLE,
+                    auto_connect=False,  # 新发现的服务器默认不自动连接
+                    priority=99  # 新发现的服务器优先级较低
                 )
         except Exception as e:
             print(f"⚠️ 分析Python服务器失败 {file_path}: {e}")
@@ -149,71 +161,61 @@ class MCPServerManager:
         return f"MCP服务器"
     
     def _load_config(self):
-        """加载服务器配置"""
+        """加载服务器配置 - 适配ReActMCP格式"""
         if self.config_file.exists():
             try:
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     config = json.load(f)
                 
-                for server_name, server_config in config.get('servers', {}).items():
-                    if server_name in self.servers:
-                        # 更新服务器配置
-                        server = self.servers[server_name]
-                        server.auto_connect = server_config.get('auto_connect', True)
-                        server.priority = server_config.get('priority', 1)
-                        server.description = server_config.get('description', server.description)
-                        server.tools_count = server_config.get('tools_count', 0)
-                        server.error_message = server_config.get('error_message', None)
+                # 直接从根级别读取服务器配置，跳过settings
+                for server_name, server_config in config.items():
+                    if server_name == 'settings':  # 跳过设置项
+                        continue
+                    
+                    # 如果是新格式的服务器配置
+                    if isinstance(server_config, dict) and 'script' in server_config:
+                        # 创建或更新服务器信息
+                        server_info = MCPServerInfo(
+                            name=server_name,
+                            description=server_config.get('description', f"{server_name} MCP服务器"),
+                            script_path=server_config.get('script', ''),
+                            script_type="python",  # 默认为python
+                            status=ServerStatus.AVAILABLE if server_config.get('active', True) else ServerStatus.DISABLED,
+                            auto_connect=server_config.get('active', True),
+                            priority=0 if server_name == 'xhs-mcp' else 1  # xhs-mcp优先级更高
+                        )
                         
-                        # 加载上次连接时间
-                        if server_config.get('last_connected'):
-                            try:
-                                from datetime import datetime
-                                server.last_connected = datetime.fromisoformat(server_config['last_connected'])
-                            except Exception:
-                                server.last_connected = None
-                        
-                        # 加载状态 - 修复：将之前CONNECTED状态重置为AVAILABLE
-                        if server_config.get('disabled', False):
-                            server.status = ServerStatus.DISABLED
-                        elif server_config.get('status'):
-                            try:
-                                config_status = ServerStatus(server_config['status'])
-                                # 重要修复：应用重启时，之前CONNECTED的服务器应该是AVAILABLE状态
-                                if config_status == ServerStatus.CONNECTED:
-                                    server.status = ServerStatus.AVAILABLE
-                                else:
-                                    server.status = config_status
-                            except ValueError:
-                                server.status = ServerStatus.AVAILABLE
-                        else:
-                            server.status = ServerStatus.AVAILABLE
+                        self.servers[server_name] = server_info
+                        print(f"✅ 加载服务器配置: {server_name}")
                 
-                print(f"📋 加载服务器配置: {self.config_file}")
+                print(f"📋 从配置文件加载了 {len([k for k in config.keys() if k != 'settings'])} 个MCP服务器")
             except Exception as e:
                 print(f"⚠️ 加载配置文件失败: {e}")
     
     def _save_config(self):
-        """保存服务器配置"""
-        config = {
-            'servers': {
-                name: {
-                    'auto_connect': server.auto_connect,
-                    'priority': server.priority,
-                    'description': server.description,
-                    'disabled': server.status == ServerStatus.DISABLED,
-                    'tools_count': server.tools_count,
-                    'last_connected': server.last_connected.isoformat() if server.last_connected else None,
-                    'status': server.status.value,
-                    'error_message': server.error_message
-                }
-                for name, server in self.servers.items()
+        """保存服务器配置 - 适配ReActMCP格式"""
+        config = {}
+        
+        # 保存每个服务器的配置
+        for name, server in self.servers.items():
+            config[name] = {
+                'script': server.script_path,
+                'encoding_error_handler': 'ignore',
+                'description': server.description,
+                'required_env_vars': [],
+                'active': server.status != ServerStatus.DISABLED
             }
+        
+        # 添加设置项
+        config['settings'] = {
+            'model': 'gpt-4o',
+            'system_prompt_path': ''
         }
         
         try:
+            self.config_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(config, f, ensure_ascii=False, indent=2)
+                json.dump(config, f, indent=2, ensure_ascii=False, default=str)
             print(f"💾 保存服务器配置: {self.config_file}")
         except Exception as e:
             print(f"⚠️ 保存配置文件失败: {e}")
