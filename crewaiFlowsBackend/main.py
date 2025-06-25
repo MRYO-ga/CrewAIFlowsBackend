@@ -34,7 +34,8 @@ from database.database import create_tables
 from database.models import (
     Account, Content, Competitor, Task, Schedule, 
     ChatMessage, CompetitorNote, Analytics,
-    SOP, SOPCycle, SOPWeek, SOPTask, SOPTaskItem
+    SOP, SOPCycle, SOPWeek, SOPTask, SOPTaskItem,
+    XhsNote, XhsSearchRecord, XhsApiLog
 )
 from api import (
     accounts_router, 
@@ -48,6 +49,7 @@ from api import (
     sops_router
 )
 from api.mcp_router import router as mcp_router
+from api.xhs import router as xhs_router
 
 
 # 服务访问的端口
@@ -105,6 +107,7 @@ app.include_router(crew_router)
 app.include_router(tasks_router)
 app.include_router(sops_router)
 app.include_router(mcp_router)
+app.include_router(xhs_router)
 
 # MCP演示页面路由
 @app.get("/mcp-demo")

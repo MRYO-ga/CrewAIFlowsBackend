@@ -11,22 +11,31 @@ from datetime import datetime
 from pathlib import Path
 
 from .mcp_client_service import MCPClientService, OpenAITool, MCPToolResult, LogType
+from .xhs_mcp_wrapper_service import xhs_mcp_wrapper
 
 class ToolService:
     """
     工具服务类 - Python版本
     提供工具列表获取和工具调用功能
+    支持单服务器和多服务器MCP客户端
     """
     
-    def __init__(self, mcp_client: MCPClientService):
+    def __init__(self, mcp_client):
         """
         构造函数
         
         Args:
-            mcp_client: MCP客户端实例
+            mcp_client: MCP客户端实例（可以是单服务器或多服务器）
         """
         self.mcp_client = mcp_client
         self.logger = logging.getLogger(__name__)
+        
+        # 检测客户端类型
+        self.is_multi_server = hasattr(mcp_client, 'get_connected_servers')
+        if self.is_multi_server:
+            print("🔧 [工具服务] 使用多服务器MCP客户端")
+        else:
+            print("🔧 [工具服务] 使用单服务器MCP客户端")
         
     async def get_tools(self) -> List[OpenAITool]:
         """
@@ -92,6 +101,12 @@ class ToolService:
             print("📞 [工具服务] 调用MCP客户端执行工具...")
             result = await self.mcp_client.call_tool(tool_name, tool_args)
             print(f"✅ [工具服务] MCP客户端调用成功，结果类型: {type(result)}")
+            
+            # 检查是否是小红书工具，如果是则进行数据保存处理
+            if xhs_mcp_wrapper.is_xhs_tool(tool_name):
+                print(f"🔄 [工具服务] 检测到小红书工具，进行数据保存处理...")
+                result = await xhs_mcp_wrapper.wrap_tool_call(tool_name, tool_args, result)
+                print(f"✅ [工具服务] 小红书工具数据保存完成")
             
             # 记录调用结果
             # self.mcp_client.add_logs(result.content, LogType.TOOL_CALL_RESPONSE)

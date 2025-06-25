@@ -14,6 +14,7 @@ from .llm_service import LLMService, StreamChunk
 from .tool_service import ToolService
 from .mcp_client_service import mcp_client_service  # 使用全局实例
 from .mcp_server_manager import mcp_server_manager
+from .multi_mcp_client_service import multi_mcp_client_service  # 多服务器MCP客户端
 
 class ChatService:
     """简化的聊天服务类"""
@@ -22,11 +23,14 @@ class ChatService:
         """初始化聊天服务"""
         self.logger = logging.getLogger(__name__)
         
-        # 使用全局MCP客户端实例（与MCPServerManager使用同一个）
+        # 使用多服务器MCP客户端实例
+        self.multi_mcp_client = multi_mcp_client_service
+        
+        # 保留单服务器MCP客户端作为备用
         self.mcp_client = mcp_client_service
         
-        # 初始化工具服务
-        self.tool_service = ToolService(self.mcp_client)
+        # 初始化工具服务（优先使用多服务器客户端）
+        self.tool_service = ToolService(self.multi_mcp_client)
         
         # 初始化LLM服务
         self.llm_service = LLMService(self.tool_service)
@@ -34,7 +38,7 @@ class ChatService:
         # MCP连接状态标志
         self._mcp_initialized = False
         
-        print("🎉 聊天服务初始化完成")
+        print("🎉 聊天服务初始化完成（支持多MCP服务器）")
     
     async def _ensure_mcp_connected(self):
         """确保MCP已连接（延迟初始化）"""
@@ -43,20 +47,34 @@ class ChatService:
             self._mcp_initialized = True
     
     async def _auto_connect_mcp(self):
-        """自动连接MCP服务器"""
+        """自动连接MCP服务器（优先使用多服务器连接）"""
         try:
-            print("🔌 开始自动连接MCP服务器...")
+            print("🔌 开始自动连接所有MCP服务器...")
             
-            # 使用MCPServerManager进行自动连接
-            success = await mcp_server_manager.auto_connect_best_server()
+            # 首先尝试连接到所有服务器（SQL + 小红书）
+            success = await self.multi_mcp_client.connect_to_all_servers()
             
             if success:
-                print("✅ MCP服务器自动连接成功")
+                print("✅ 多服务器MCP连接成功")
+                return True
             else:
-                print("❌ MCP服务器自动连接失败")
+                print("⚠️ 多服务器MCP连接失败，尝试单服务器模式...")
+                
+                # 如果多服务器连接失败，回退到单服务器模式
+                fallback_success = await mcp_server_manager.auto_connect_best_server()
+                
+                if fallback_success:
+                    print("✅ 单服务器MCP连接成功（回退模式）")
+                    # 切换工具服务到单服务器客户端
+                    self.tool_service = ToolService(self.mcp_client)
+                    return True
+                else:
+                    print("❌ 所有MCP连接方式都失败")
+                    return False
             
         except Exception as e:
             print(f"❌ 自动连接MCP服务器失败: {e}")
+            return False
     
     async def process_message_stream(self, user_input: str, user_id: str = "default", 
                                    conversation_history: Optional[List[Dict[str, Any]]] = None) -> AsyncGenerator[Dict[str, Any], None]:
@@ -126,14 +144,45 @@ class ChatService:
             # 确保MCP已连接
             await self._ensure_mcp_connected()
             
-            is_connected = self.mcp_client.is_connected()
-            tools = await self.tool_service.get_tools_for_llm() if is_connected else []
+            # 优先检查多服务器连接状态
+            multi_connected = self.multi_mcp_client.is_connected()
+            single_connected = self.mcp_client.is_connected()
             
-            return {
-                "connected": is_connected,
-                "tools_count": len(tools),
-                "tools": [{"name": t["name"], "description": t["description"]} for t in tools]
-            }
+            is_connected = multi_connected or single_connected
+            
+            if multi_connected:
+                # 使用多服务器客户端的工具
+                tools = await self.multi_mcp_client.get_tools()
+                connected_servers = self.multi_mcp_client.get_connected_servers()
+                tool_list = [{"name": t.function["name"], "description": t.function["description"]} for t in tools]
+                
+                return {
+                    "connected": True,
+                    "tools_count": len(tools),
+                    "tools": tool_list,
+                    "connected_servers": connected_servers,
+                    "connection_type": "multi_server"
+                }
+            elif single_connected:
+                # 使用单服务器客户端的工具
+                tools = await self.tool_service.get_tools_for_llm()
+                tool_list = [{"name": t["name"], "description": t["description"]} for t in tools]
+                
+                return {
+                    "connected": True,
+                    "tools_count": len(tools),
+                    "tools": tool_list,
+                    "connected_servers": ["single_server"],
+                    "connection_type": "single_server"
+                }
+            else:
+                return {
+                    "connected": False,
+                    "tools_count": 0,
+                    "tools": [],
+                    "connected_servers": [],
+                    "connection_type": "none"
+                }
             
         except Exception as e:
             self.logger.error(f"获取MCP状态失败: {e}")
@@ -141,17 +190,26 @@ class ChatService:
                 "connected": False,
                 "tools_count": 0,
                 "tools": [],
+                "connected_servers": [],
                 "error": str(e)
             }
     
     async def reconnect_mcp(self) -> bool:
         """重新连接MCP服务器"""
         try:
-            print("🔄 重新连接MCP服务器...")
+            print("🔄 重新连接所有MCP服务器...")
             # 重置初始化标志，强制重新连接
             self._mcp_initialized = False
+            
+            # 关闭现有连接
+            if self.multi_mcp_client.is_connected():
+                await self.multi_mcp_client.close()
+            
+            # 重新连接
             await self._ensure_mcp_connected()
-            return self.mcp_client.is_connected()
+            
+            # 检查连接状态
+            return self.multi_mcp_client.is_connected() or self.mcp_client.is_connected()
             
         except Exception as e:
             self.logger.error(f"重新连接MCP失败: {e}")

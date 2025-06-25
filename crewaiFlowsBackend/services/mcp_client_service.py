@@ -435,8 +435,8 @@ class MCPClientService:
             
             # 执行工具调用
             result = await self.client.call_tool(tool_name, tool_args)
-            print(f"📦 [MCP工具调用] 原始调用结果类型: {type(result)}")
-            print(f"🔍 [MCP工具调用] 结果内容: {result}")
+            # print(f"📦 [MCP工具调用] 原始调用结果类型: {type(result)}")
+            # print(f"🔍 [MCP工具调用] 结果内容: {result}")
             
             # 检查结果的内容
             if hasattr(result, 'content'):

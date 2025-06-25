@@ -99,13 +99,17 @@ class MultiMCPClientService:
                     print("❌ 无法加载MCP配置")
                     return False
                 
+                print(f"📋 加载到 {len(mcp_config)} 个配置项")
+                
                 # 2. 创建多服务器客户端
                 self.client = MultiServerMCPClient()
+                print("✅ 创建MultiServerMCPClient成功")
                 
                 # 3. 遍历配置，连接每个活跃的服务器
                 connected_count = 0
                 for server_name, server_config in mcp_config.items():
                     if server_name == "settings":
+                        print(f"⏭️ 跳过设置项: {server_name}")
                         continue
                     
                     if not server_config.get("active", False):
@@ -114,12 +118,19 @@ class MultiMCPClientService:
                     
                     try:
                         script_path = server_config.get("script", "")
-                        if not script_path or not os.path.exists(script_path):
+                        if not script_path:
+                            print(f"❌ 服务器脚本路径为空: {server_name}")
+                            self.connected_servers[server_name] = False
+                            continue
+                            
+                        if not os.path.exists(script_path):
                             print(f"❌ 服务器脚本不存在: {server_name} -> {script_path}")
                             self.connected_servers[server_name] = False
                             continue
                         
-                        print(f"🔗 连接到服务器: {server_name}")
+                        print(f"🔗 开始连接到服务器: {server_name}")
+                        print(f"📂 脚本路径: {script_path}")
+                        print(f"🐍 Python解释器: {sys.executable}")
                         
                         # 4. 启动子进程运行MCP服务器
                         await self.client.connect_to_server(
@@ -134,26 +145,49 @@ class MultiMCPClientService:
                         connected_count += 1
                         print(f"✅ 成功连接到服务器: {server_name}")
                         
+                        # 等待一点时间确保连接稳定
+                        await asyncio.sleep(0.5)
+                        
                     except Exception as e:
                         print(f"❌ 连接服务器失败 {server_name}: {str(e)}")
+                        print(f"🔍 错误类型: {type(e).__name__}")
+                        import traceback
+                        print(f"📊 错误堆栈: {traceback.format_exc()}")
                         self.connected_servers[server_name] = False
                 
                 if connected_count > 0:
                     print(f"🎉 成功连接到 {connected_count} 个MCP服务器")
+                    print(f"📊 连接状态: {self.connected_servers}")
+                    
+                    # 验证连接
+                    try:
+                        tools = await self.get_tools()
+                        print(f"🔧 获取到 {len(tools)} 个工具")
+                        for tool in tools:
+                            print(f"  - {tool.function['name']}: {tool.function.get('description', 'No description')[:50]}...")
+                    except Exception as e:
+                        print(f"⚠️ 获取工具时出现错误: {e}")
+                    
                     self.add_logs({
                         "connected_servers": list(self.connected_servers.keys()),
-                        "connected_count": connected_count
+                        "connected_count": connected_count,
+                        "connection_status": self.connected_servers
                     }, LogType.CONNECT_TO_SERVER)
                     return True
                 else:
                     print("❌ 没有成功连接到任何MCP服务器")
+                    print(f"📊 最终连接状态: {self.connected_servers}")
                     return False
                     
             except Exception as e:
                 print(f"❌ 连接所有服务器失败: {str(e)}")
+                print(f"🔍 错误类型: {type(e).__name__}")
+                import traceback
+                print(f"📊 错误堆栈: {traceback.format_exc()}")
                 self.add_logs({
                     "error": str(e),
-                    "error_type": type(e).__name__
+                    "error_type": type(e).__name__,
+                    "traceback": traceback.format_exc()
                 }, LogType.GET_TOOLS_ERROR)
                 return False
     

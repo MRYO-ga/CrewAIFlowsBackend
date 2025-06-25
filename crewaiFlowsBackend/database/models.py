@@ -1,5 +1,5 @@
 # 数据库模型定义
-from sqlalchemy import Column, Integer, String, Text, DateTime, Float, Boolean, JSON, ForeignKey, Index
+from sqlalchemy import Column, Integer, String, Text, DateTime, Float, Boolean, JSON, ForeignKey, Index, BigInteger
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -359,4 +359,107 @@ class SOPTaskItem(Base):
     task = relationship("SOPTask", back_populates="items")
 
 # 更新Competitor模型，添加notes关系
-Competitor.notes = relationship("CompetitorNote", back_populates="competitor") 
+Competitor.notes = relationship("CompetitorNote", back_populates="competitor")
+
+# 小红书数据模型
+
+class XhsNote(Base):
+    """小红书笔记模型"""
+    __tablename__ = "xhs_notes"
+
+    id = Column(String(100), primary_key=True, comment="笔记ID")
+    display_title = Column(String(500), comment="显示标题")
+    title = Column(String(500), comment="笔记标题")
+    content = Column(Text, comment="笔记内容")
+    note_type = Column(String(50), default="normal", comment="笔记类型")
+    model_type = Column(String(50), default="note", comment="模型类型")
+    
+    # 用户信息
+    user_id = Column(String(100), comment="用户ID")
+    user_nickname = Column(String(200), comment="用户昵称")
+    user_avatar = Column(String(500), comment="用户头像")
+    
+    # 互动数据
+    liked_count = Column(Integer, default=0, comment="点赞数")
+    comment_count = Column(Integer, default=0, comment="评论数")
+    collected_count = Column(Integer, default=0, comment="收藏数")
+    shared_count = Column(Integer, default=0, comment="分享数")
+    liked = Column(Boolean, default=False, comment="当前用户是否点赞")
+    collected = Column(Boolean, default=False, comment="当前用户是否收藏")
+    
+    # 封面图片信息
+    cover_url_default = Column(String(500), comment="封面图片默认链接")
+    cover_url_pre = Column(String(500), comment="封面图片预览链接")
+    cover_height = Column(Integer, comment="封面图片高度")
+    cover_width = Column(Integer, comment="封面图片宽度")
+    
+    # 图片列表
+    image_list = Column(JSON, comment="笔记图片列表")
+    
+    # 角标信息
+    corner_tag_info = Column(JSON, comment="角标信息")
+    
+    # 发布时间
+    publish_time = Column(BigInteger, comment="发布时间戳")
+    
+    # 数据来源
+    source = Column(String(50), default="api", comment="数据来源：api, search, home_feed")
+    search_keyword = Column(String(200), comment="搜索关键词（如果来源是搜索）")
+    
+    # 创建和更新时间
+    created_at = Column(DateTime, default=func.now(), comment="数据创建时间")
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="数据更新时间")
+    
+    # 时间戳字段
+    created_at = Column(DateTime, default=func.now(), comment="数据创建时间")
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="数据更新时间")
+
+
+class XhsSearchRecord(Base):
+    """小红书搜索记录模型"""
+    __tablename__ = "xhs_search_records"
+
+    id = Column(String(50), primary_key=True, comment="记录ID")
+    keyword = Column(String(200), nullable=False, comment="搜索关键词")
+    search_type = Column(String(50), default="notes", comment="搜索类型：notes, users")
+    result_count = Column(Integer, default=0, comment="搜索结果数量")
+    
+    # 搜索参数
+    page = Column(Integer, default=1, comment="页码")
+    page_size = Column(Integer, default=20, comment="每页数量")
+    sort = Column(String(50), default="general", comment="排序方式")
+    
+    # 搜索结果统计
+    total_results = Column(Integer, default=0, comment="总结果数")
+    has_more = Column(Boolean, default=False, comment="是否还有更多")
+    
+    # 时间信息
+    search_time = Column(DateTime, default=func.now(), comment="搜索时间")
+    created_at = Column(DateTime, default=func.now(), comment="创建时间")
+
+
+class XhsApiLog(Base):
+    """小红书API调用日志模型"""
+    __tablename__ = "xhs_api_logs"
+
+    id = Column(String(50), primary_key=True, comment="日志ID")
+    api_name = Column(String(100), nullable=False, comment="API接口名称")
+    method = Column(String(20), comment="请求方法")
+    endpoint = Column(String(200), comment="请求端点")
+    
+    # 请求参数
+    request_params = Column(JSON, comment="请求参数")
+    
+    # 响应信息
+    response_code = Column(Integer, comment="响应状态码")
+    response_time = Column(Float, comment="响应时间（秒）")
+    response_size = Column(Integer, comment="响应大小（字节）")
+    
+    # 结果统计
+    success = Column(Boolean, default=True, comment="是否成功")
+    error_message = Column(Text, comment="错误信息")
+    data_count = Column(Integer, default=0, comment="返回数据条数")
+    
+    # 时间信息
+    call_time = Column(DateTime, default=func.now(), comment="调用时间")
+    created_at = Column(DateTime, default=func.now(), comment="创建时间") 

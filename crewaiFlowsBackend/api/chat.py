@@ -15,7 +15,7 @@ async def save_chat_message():
 
 # chat API路由模块 - 处理智能对话和优化相关的API接口
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
@@ -36,6 +36,8 @@ class ChatRequest(BaseModel):
     user_input: str = Field(..., description="用户输入的消息")
     conversation_history: Optional[List[Dict[str, Any]]] = Field(None, description="对话历史")
     user_id: Optional[str] = Field("default_user", description="用户ID")
+    attached_data: Optional[List[Dict[str, Any]]] = Field(None, description="附加的引用数据")
+    data_references: Optional[List[Dict[str, Any]]] = Field(None, description="数据引用信息")
 
 
 # 定义智能优化请求模型
@@ -53,8 +55,38 @@ async def chat_with_agent(request: ChatRequest):
         print(f"收到非流式聊天请求，用户ID: {request.user_id}")
         print(f"用户输入: {request.user_input}")
         
+        # 处理附加的引用数据
+        enhanced_input = request.user_input
+        references = []
+        
+        if request.attached_data and len(request.attached_data) > 0:
+            print(f"发现附加数据: {len(request.attached_data)} 项")
+            
+            # 构建引用上下文
+            reference_context = "\n\n[引用的笔记数据]:\n"
+            for i, data in enumerate(request.attached_data, 1):
+                if data.get('type') == 'note':
+                    note_info = data.get('data', {})
+                    reference_context += f"\n{i}. 《{note_info.get('title', '无标题')}》\n"
+                    reference_context += f"   作者：{note_info.get('author_name', '未知')}\n"
+                    reference_context += f"   点赞：{note_info.get('likes_count', 0)} | 评论：{note_info.get('comments_count', 0)} | 收藏：{note_info.get('collects_count', 0)}\n"
+                    if note_info.get('content'):
+                        preview = note_info['content'][:200] + "..." if len(note_info['content']) > 200 else note_info['content']
+                        reference_context += f"   内容：{preview}\n"
+                    
+                    references.append({
+                        "id": note_info.get('note_id', ''),
+                        "title": note_info.get('title', '无标题'),
+                        "author": note_info.get('author_name', '未知'),
+                        "url": f"#note-{note_info.get('note_id', '')}",
+                        "description": f"点赞 {note_info.get('likes_count', 0)} | 收藏 {note_info.get('collects_count', 0)}"
+                    })
+            
+            enhanced_input = request.user_input + reference_context
+            print(f"增强输入长度: {len(enhanced_input)}")
+        
         response = await chat_service.simple_chat(
-            user_input=request.user_input,
+            user_input=enhanced_input,
             user_id=request.user_id,
             conversation_history=request.conversation_history
         )
@@ -63,8 +95,12 @@ async def chat_with_agent(request: ChatRequest):
             "status": "success",
             "reply": response,
             "final_answer": response,
+            "references": references,
+            "hasData": len(references) > 0,
+            "dataType": "note_reference" if len(references) > 0 else None,
             "data": {
-                "type": "simple_chat"
+                "type": "simple_chat",
+                "reference_count": len(references)
             }
         }
         
@@ -298,4 +334,113 @@ async def get_chat_history():
 @chat_router.post("/chat/save")
 async def save_message():
     """保存聊天消息（待实现）"""
-    return {"message": "消息保存功能开发中"} 
+    return {"message": "消息保存功能开发中"}
+
+
+@chat_router.get("/chat/references/{user_id}")
+async def get_user_references(
+    user_id: str, 
+    limit: int = Query(20, ge=1, le=100), 
+    search: Optional[str] = Query(None)
+):
+    """获取用户的引用数据，供@功能使用"""
+    try:
+        from services.mcp_cache_service import mcp_cache_service
+        
+        # 获取笔记数据
+        notes = await mcp_cache_service.get_user_notes(user_id, limit)
+        
+        # 如果有搜索关键词，进行过滤
+        if search:
+            search_lower = search.lower()
+            notes = [
+                note for note in notes
+                if (note.get('title', '').lower().find(search_lower) >= 0 or
+                    note.get('content', '').lower().find(search_lower) >= 0 or
+                    note.get('author_name', '').lower().find(search_lower) >= 0)
+            ]
+        
+        # 转换为引用格式
+        references = []
+        for note in notes:
+            references.append({
+                "id": note.get('note_id', ''),
+                "type": "note",
+                "name": note.get('title', '无标题'),
+                "subInfo": f"作者：{note.get('author_name', '未知')} | 点赞：{note.get('likes_count', 0)}",
+                "data": note
+            })
+        
+        return {
+            "status": "success",
+            "data": {
+                "references": references,
+                "total": len(references),
+                "user_id": user_id
+            }
+        }
+        
+    except Exception as e:
+        print(f"获取引用数据失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取引用数据失败: {str(e)}")
+
+
+@chat_router.get("/chat/reference-categories/{user_id}")
+async def get_reference_categories(user_id: str):
+    """获取引用数据的分类，供侧边栏展示使用"""
+    try:
+        from services.mcp_cache_service import mcp_cache_service
+        
+        # 获取用户数据
+        notes = await mcp_cache_service.get_user_notes(user_id, 100)
+        searches = await mcp_cache_service.get_user_searches(user_id, 20)
+        
+        categories = []
+        
+        # 笔记分类
+        if notes:
+            note_items = []
+            for note in notes[:20]:  # 限制显示数量
+                note_items.append({
+                    "type": "note",
+                    "name": note.get('title', '无标题'),
+                    "subInfo": f"作者：{note.get('author_name', '未知')} | 点赞：{note.get('likes_count', 0)}",
+                    "data": note
+                })
+            
+            categories.append({
+                "title": "笔记数据",
+                "icon": "FileTextOutlined",
+                "items": note_items,
+                "total": len(notes)
+            })
+        
+        # 搜索历史分类
+        if searches:
+            search_items = []
+            for search in searches[:10]:  # 限制显示数量
+                search_items.append({
+                    "type": "search",
+                    "name": search.get('keywords', ''),
+                    "subInfo": f"结果：{search.get('total_count', 0)} 条",
+                    "data": search
+                })
+            
+            categories.append({
+                "title": "搜索历史",
+                "icon": "SearchOutlined", 
+                "items": search_items,
+                "total": len(searches)
+            })
+        
+        return {
+            "status": "success",
+            "data": {
+                "categories": categories,
+                "user_id": user_id
+            }
+        }
+        
+    except Exception as e:
+        print(f"获取引用分类失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取引用分类失败: {str(e)}") 
