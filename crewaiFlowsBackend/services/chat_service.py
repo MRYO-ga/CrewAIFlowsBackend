@@ -77,14 +77,18 @@ class ChatService:
             return False
     
     async def process_message_stream(self, user_input: str, user_id: str = "default", 
-                                   conversation_history: Optional[List[Dict[str, Any]]] = None) -> AsyncGenerator[Dict[str, Any], None]:
+                                   model: str = "gpt-4o-mini",
+                                   conversation_history: Optional[List[Dict[str, Any]]] = None,
+                                   attached_data: Optional[List[Dict[str, Any]]] = None) -> AsyncGenerator[Dict[str, Any], None]:
         """
         流式处理用户消息
         
         Args:
             user_input: 用户输入
             user_id: 用户ID
+            model: 使用的AI模型
             conversation_history: 对话历史
+            attached_data: 附加的引用数据
             
         Yields:
             流式响应数据
@@ -92,11 +96,19 @@ class ChatService:
         try:
             print(f"📨 收到用户消息: {user_input[:50]}...")
             
+            # 记录附加数据信息
+            if attached_data and len(attached_data) > 0:
+                print(f"📎 检测到附加数据: {len(attached_data)} 项")
+                for i, data in enumerate(attached_data, 1):
+                    data_type = data.get('type', 'unknown')
+                    data_name = data.get('data', {}).get('name', '未知')
+                    print(f"   {i}. 【{data_type}】{data_name}")
+            
             # 确保MCP已连接
             await self._ensure_mcp_connected()
             
             # 开始流式处理
-            async for chunk in self.llm_service.process_message_stream(user_input, conversation_history):
+            async for chunk in self.llm_service.process_message_stream(user_input, conversation_history, model):
                 # 转换为API响应格式
                 yield {
                     "type": chunk.type,
@@ -115,6 +127,7 @@ class ChatService:
             }
     
     async def simple_chat(self, user_input: str, user_id: str = "default", 
+                         model: str = "gpt-4o-mini",
                          conversation_history: Optional[List[Dict[str, Any]]] = None) -> str:
         """
         简单聊天接口（非流式）
@@ -122,6 +135,7 @@ class ChatService:
         Args:
             user_input: 用户输入
             user_id: 用户ID
+            model: 使用的AI模型
             conversation_history: 对话历史
             
         Returns:
@@ -131,7 +145,7 @@ class ChatService:
             # 确保MCP已连接
             await self._ensure_mcp_connected()
             
-            response = await self.llm_service.simple_chat(user_input, conversation_history)
+            response = await self.llm_service.simple_chat(user_input, conversation_history, model)
             return response
             
         except Exception as error:

@@ -25,6 +25,51 @@ OLLAMA_API_BASE = "http://localhost:11434/v1"
 OLLAMA_CHAT_API_KEY = "ollama"
 OLLAMA_CHAT_MODEL = "llama3.1:latest"
 
+# 多模型配置映射
+MODEL_CONFIGS = {
+    # OpenAI模型
+    'gpt-4o-mini': {
+        'provider': 'openai',
+        'api_base': OPENAI_API_BASE,
+        'api_key': OPENAI_CHAT_API_KEY,
+        'model': 'gpt-4o-mini'
+    },
+    'gpt-4o': {
+        'provider': 'openai',
+        'api_base': OPENAI_API_BASE,
+        'api_key': OPENAI_CHAT_API_KEY,
+        'model': 'gpt-4o'
+    },
+    
+    # Claude模型（通过云雾AI的兼容接口）
+    'claude-sonnet-4-20250514': {
+        'provider': 'openai',  # 使用OpenAI兼容接口
+        'api_base': OPENAI_API_BASE,
+        'api_key': OPENAI_CHAT_API_KEY,
+        'model': 'claude-sonnet-4-20250514'
+    },
+    'claude-3-7-sonnet-20250219-thinking': {
+        'provider': 'openai',
+        'api_base': OPENAI_API_BASE,
+        'api_key': OPENAI_CHAT_API_KEY,
+        'model': 'claude-3-7-sonnet-20250219-thinking'
+    },
+    'claude-3-5-sonnet-20241022': {
+        'provider': 'openai',
+        'api_base': OPENAI_API_BASE,
+        'api_key': OPENAI_CHAT_API_KEY,
+        'model': 'claude-3-5-sonnet-20241022'
+    },
+    
+    # DeepSeek模型
+    'deepseek-r1-2025-01-20': {
+        'provider': 'openai',
+        'api_base': OPENAI_API_BASE,
+        'api_key': OPENAI_CHAT_API_KEY,
+        'model': 'deepseek-r1-2025-01-20'
+    }
+}
+
 # 定函数 模型初始化
 def my_llm(llmType, model="gpt-4o-mini"):
     if llmType == "oneapi":
@@ -79,13 +124,105 @@ def chat_with_llm(messages, llmType="openai", model=OPENAI_CHAT_MODEL):
     Args:
         messages: 对话历史消息列表
         llmType: 大语言模型类型，默认为"openai"
+        model: 使用的模型名称
         
     Returns:
         str: LLM的回复内容
     """
-    print(f"开始调用LLM，类型: {llmType}")
+    print(f"开始调用LLM，类型: {llmType}，模型: {model}")
     
-    if llmType == "openai":
+    # 检查是否在模型配置中
+    if model in MODEL_CONFIGS:
+        config = MODEL_CONFIGS[model]
+        print(f"使用配置的模型: {model} -> {config}")
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {config['api_key']}"
+        }
+        
+        payload = {
+            "model": config['model'],
+            "messages": messages,
+            "temperature": 0.7
+        }
+        
+        print(f"API基础URL: {config['api_base']}")
+        print(f"使用模型: {config['model']}")
+        print(f"消息数量: {len(messages)}")
+        
+        try:
+            print("正在发送API请求...")
+            response = requests.post(
+                f"{config['api_base']}/chat/completions", 
+                headers=headers,
+                json=payload,
+                timeout=60
+            )
+            
+            print(f"API响应状态码: {response.status_code}")
+            
+            if response.status_code == 200:
+                response_data = response.json()
+                print("API调用成功，正在处理响应")
+                
+                if response_data.get("choices") and len(response_data["choices"]) > 0:
+                    content = response_data["choices"][0]["message"]["content"]
+                    print(f"获取到内容: {content[:100]}...")
+                    
+                    # 尝试解析为JSON
+                    try:
+                        # 查找content中的JSON字符串
+                        json_match = re.search(r'\{[\s\S]*\}', content)
+                        if json_match:
+                            print("找到JSON匹配")
+                            json_content = json.loads(json_match.group())
+                            # 如果解析出的JSON包含必要的字段，直接返回
+                            if isinstance(json_content, dict) and "reply" in json_content and "data" in json_content:
+                                print("返回完整的JSON响应")
+                                return json.dumps(json_content, ensure_ascii=False)
+                            # 否则构造标准响应
+                            print("构造标准JSON响应")
+                            return json.dumps({
+                                "reply": content,
+                                "data": json_content
+                            }, ensure_ascii=False)
+                        else:
+                            print("未找到JSON匹配，返回普通文本响应")
+                            return json.dumps({
+                                "reply": content,
+                                "data": {}
+                            }, ensure_ascii=False)
+                    except json.JSONDecodeError as e:
+                        print(f"JSON解析错误: {str(e)}")
+                        # 如果不是JSON格式，构造一个标准响应
+                        return json.dumps({
+                            "reply": content,
+                            "data": {}
+                        }, ensure_ascii=False)
+                else:
+                    print("未找到有效回复")
+                    return json.dumps({
+                        "reply": "抱歉，我没有收到有效的回复。",
+                        "data": {}
+                    }, ensure_ascii=False)
+            else:
+                error_msg = f"API调用失败: {response.status_code}, {response.text}"
+                print(error_msg)
+                return json.dumps({
+                    "reply": f"抱歉，服务暂时不可用 (错误码: {response.status_code})，请稍后再试。",
+                    "data": {}
+                }, ensure_ascii=False)
+                
+        except requests.exceptions.RequestException as e:
+            error_msg = f"请求异常: {str(e)}"
+            print(error_msg)
+            return json.dumps({
+                "reply": f"抱歉，网络连接出现问题: {str(e)}，请稍后再试。",
+                "data": {}
+            }, ensure_ascii=False)
+    
+    elif llmType == "openai":
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {OPENAI_CHAT_API_KEY}"

@@ -36,6 +36,7 @@ class ChatRequest(BaseModel):
     user_input: str = Field(..., description="用户输入的消息")
     conversation_history: Optional[List[Dict[str, Any]]] = Field(None, description="对话历史")
     user_id: Optional[str] = Field("default_user", description="用户ID")
+    model: Optional[str] = Field("gpt-4o-mini", description="使用的AI模型")
     attached_data: Optional[List[Dict[str, Any]]] = Field(None, description="附加的引用数据")
     data_references: Optional[List[Dict[str, Any]]] = Field(None, description="数据引用信息")
 
@@ -62,25 +63,22 @@ async def chat_with_agent(request: ChatRequest):
         if request.attached_data and len(request.attached_data) > 0:
             print(f"发现附加数据: {len(request.attached_data)} 项")
             
-            # 构建引用上下文
-            reference_context = "\n\n[引用的笔记数据]:\n"
+            # 直接将数据转为字符串，不进行复杂格式化
+            reference_context = "\n\n[引用数据]:\n"
             for i, data in enumerate(request.attached_data, 1):
-                if data.get('type') == 'note':
-                    note_info = data.get('data', {})
-                    reference_context += f"\n{i}. 《{note_info.get('title', '无标题')}》\n"
-                    reference_context += f"   作者：{note_info.get('author_name', '未知')}\n"
-                    reference_context += f"   点赞：{note_info.get('likes_count', 0)} | 评论：{note_info.get('comments_count', 0)} | 收藏：{note_info.get('collects_count', 0)}\n"
-                    if note_info.get('content'):
-                        preview = note_info['content'][:200] + "..." if len(note_info['content']) > 200 else note_info['content']
-                        reference_context += f"   内容：{preview}\n"
-                    
-                    references.append({
-                        "id": note_info.get('note_id', ''),
-                        "title": note_info.get('title', '无标题'),
-                        "author": note_info.get('author_name', '未知'),
-                        "url": f"#note-{note_info.get('note_id', '')}",
-                        "description": f"点赞 {note_info.get('likes_count', 0)} | 收藏 {note_info.get('collects_count', 0)}"
-                    })
+                data_type = data.get('type', 'unknown')
+                data_info = data.get('data', {})
+                reference_context += f"\n{i}. 数据类型: {data_type}\n"
+                reference_context += f"   数据内容: {str(data_info)}\n"
+                
+                # 简化references构建
+                references.append({
+                    "id": data_info.get('id', data_info.get('note_id', '')),
+                    "title": data_info.get('name', data_info.get('title', '数据项')),
+                    "author": data_type,
+                    "url": f"#{data_type}-{data_info.get('id', '')}",
+                    "description": f"类型: {data_type}"
+                })
             
             enhanced_input = request.user_input + reference_context
             print(f"增强输入长度: {len(enhanced_input)}")
@@ -88,6 +86,7 @@ async def chat_with_agent(request: ChatRequest):
         response = await chat_service.simple_chat(
             user_input=enhanced_input,
             user_id=request.user_id,
+            model=request.model,
             conversation_history=request.conversation_history
         )
         
@@ -176,10 +175,32 @@ async def stream_chat_with_agent(request: ChatRequest):
             print(f"收到流式聊天请求，用户ID: {request.user_id}")
             print(f"用户输入: {request.user_input}")
             
+            # 处理附加的引用数据
+            enhanced_input = request.user_input
+            
+            if request.attached_data and len(request.attached_data) > 0:
+                print(f"📎 发现附加数据: {len(request.attached_data)} 项")
+                
+                # 直接将数据转为字符串，不进行复杂格式化
+                reference_context = "\n\n[引用数据]:\n"
+                for i, data in enumerate(request.attached_data, 1):
+                    data_type = data.get('type', 'unknown')
+                    data_info = data.get('data', {})
+                    
+                    print(f"📋 处理引用数据 {i}: 类型={data_type}, 名称={data_info.get('name', '未知')}")
+                    
+                    reference_context += f"\n{i}. 数据类型: {data_type}\n"
+                    reference_context += f"   数据内容: {str(data_info)}\n"
+                
+                enhanced_input = request.user_input + reference_context
+                print(f"✅ 增强输入长度: {len(enhanced_input)}")
+            
             async for chunk in chat_service.process_message_stream(
-                user_input=request.user_input,
+                user_input=enhanced_input,
                 user_id=request.user_id,
-                conversation_history=request.conversation_history
+                model=request.model,
+                conversation_history=request.conversation_history,
+                attached_data=request.attached_data
             ):
                 # 发送服务器发送事件格式
                 yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
@@ -444,3 +465,118 @@ async def get_reference_categories(user_id: str):
     except Exception as e:
         print(f"获取引用分类失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"获取引用分类失败: {str(e)}") 
+
+
+@chat_router.get("/chat/available-models")
+async def get_available_models():
+    """获取可用的AI模型列表"""
+    try:
+        print("开始获取可用模型列表...")
+        
+        # 直接定义模型配置，避免导入问题
+        MODEL_CONFIGS = {
+            # OpenAI模型
+            'gpt-4o-mini': {
+                'provider': 'openai',
+                'model': 'gpt-4o-mini'
+            },
+            'gpt-4o': {
+                'provider': 'openai',
+                'model': 'gpt-4o'
+            },
+            
+            # Claude模型（通过云雾AI的兼容接口）
+            'claude-sonnet-4-20250514': {
+                'provider': 'anthropic',
+                'model': 'claude-sonnet-4-20250514'
+            },
+            'claude-3-7-sonnet-20250219-thinking': {
+                'provider': 'anthropic',
+                'model': 'claude-3-7-sonnet-20250219-thinking'
+            },
+            'claude-3-5-sonnet-20241022': {
+                'provider': 'anthropic',
+                'model': 'claude-3-5-sonnet-20241022'
+            },
+            
+            # DeepSeek模型
+            'deepseek-r1-2025-01-20': {
+                'provider': 'deepseek',
+                'model': 'deepseek-r1-2025-01-20'
+            }
+        }
+        
+        print(f"找到 {len(MODEL_CONFIGS)} 个模型配置")
+        
+        models = []
+        for model_key, config in MODEL_CONFIGS.items():
+            # 生成友好的标签名
+            if model_key == 'gpt-4o-mini':
+                label = 'GPT-4o Mini'
+            elif model_key == 'gpt-4o':
+                label = 'GPT-4o'
+            elif 'claude-sonnet-4' in model_key:
+                label = 'Claude Sonnet 4'
+            elif 'claude-3-7-sonnet' in model_key:
+                label = 'Claude 3.7 Sonnet (Thinking)'
+            elif 'claude-3-5-sonnet' in model_key:
+                label = 'Claude 3.5 Sonnet'
+            elif 'deepseek-r1' in model_key:
+                label = 'DeepSeek R1'
+            else:
+                label = model_key.replace('-', ' ').title()
+            
+            model_info = {
+                "value": model_key,
+                "label": label,
+                "provider": config.get('provider', 'unknown'),
+                "model": config.get('model', model_key)
+            }
+            
+            # 添加描述信息
+            if 'gpt-4o-mini' in model_key:
+                model_info["description"] = "快速、经济的模型，适合日常对话"
+            elif 'gpt-4o' in model_key:
+                model_info["description"] = "更强大的推理能力，适合复杂任务"
+            elif 'claude-sonnet-4' in model_key:
+                model_info["description"] = "最新Claude模型，优秀的推理和创作能力"
+            elif 'claude-3-7-sonnet' in model_key:
+                model_info["description"] = "具有深度思考能力的Claude模型"
+            elif 'claude-3-5-sonnet' in model_key:
+                model_info["description"] = "平衡性能和速度的Claude模型"
+            elif 'deepseek-r1' in model_key:
+                model_info["description"] = "中文优化的强推理模型"
+            else:
+                model_info["description"] = "高质量的AI模型"
+            
+            models.append(model_info)
+        
+        print(f"成功构建了 {len(models)} 个模型信息")
+        
+        return {
+            "status": "success",
+            "models": models,
+            "total_models": len(models)
+        }
+        
+    except Exception as e:
+        print(f"获取可用模型列表出错: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        # 返回默认模型列表作为后备
+        default_models = [
+            {
+                "value": "gpt-4o-mini",
+                "label": "GPT-4o Mini",
+                "provider": "openai",
+                "description": "快速、经济的模型，适合日常对话"
+            }
+        ]
+        
+        return {
+            "status": "success",
+            "models": default_models,
+            "total_models": len(default_models),
+            "error": f"使用默认配置: {str(e)}"
+        }

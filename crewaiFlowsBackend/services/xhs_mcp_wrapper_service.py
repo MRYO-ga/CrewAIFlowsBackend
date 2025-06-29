@@ -31,7 +31,7 @@ class XhsMCPWrapperService:
             'search_notes': '根据关键词搜索笔记',
             'get_note_content': '获取笔记内容',
             'get_note_comments': '获取笔记评论',
-            'post_comment': '发布评论到指定笔记'
+            # 'post_comment': '发布评论到指定笔记'
         }
     
     def is_xhs_tool(self, tool_name: str) -> bool:

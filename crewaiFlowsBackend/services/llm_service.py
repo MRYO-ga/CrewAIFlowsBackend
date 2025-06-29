@@ -127,13 +127,14 @@ class LLMService:
 - 不要在单次响应中承诺多个工具调用，按需逐个执行
 - 不要使用除了指定JSON格式外的任何工具调用格式"""
         
-    async def process_message_stream(self, user_input: str, conversation_history: Optional[List[Dict[str, Any]]] = None) -> AsyncGenerator[StreamChunk, None]:
+    async def process_message_stream(self, user_input: str, conversation_history: Optional[List[Dict[str, Any]]] = None, model: str = None) -> AsyncGenerator[StreamChunk, None]:
         """
         流式处理用户消息，支持工具调用
         
         Args:
             user_input: 用户输入
             conversation_history: 对话历史
+            model: 使用的模型（如果为None则使用默认模型）
             
         Yields:
             StreamChunk: 流式输出数据块
@@ -187,7 +188,9 @@ class LLMService:
                     timestamp=datetime.now().isoformat()
                 )
                 
-                llm_response = await self._call_llm(messages)
+                # 使用指定的模型（如果提供了的话）
+                current_model = model if model else self.model
+                llm_response = await self._call_llm(messages, current_model)
                 
                 # 检查是否包含工具调用
                 tool_call = self._extract_tool_call(llm_response)
@@ -523,12 +526,13 @@ class LLMService:
         except Exception as e:
             return f"结果格式化失败: {e}"
     
-    async def _call_llm(self, messages: List[Dict[str, str]]) -> str:
+    async def _call_llm(self, messages: List[Dict[str, str]], model: str = None) -> str:
         """
         调用LLM API
         
         Args:
             messages: 消息列表
+            model: 使用的模型（如果为None则使用默认模型）
             
         Returns:
             LLM响应内容
@@ -540,10 +544,12 @@ class LLMService:
             #     LogType.LLM_REQUEST
             # )
             
-            print(f"🤖 调用LLM: {self.llm_type}/{self.model}")
+            # 使用指定的模型或默认模型
+            current_model = model if model else self.model
+            print(f"🤖 调用LLM: {self.llm_type}/{current_model}")
             
             # 使用myLLM.py中的chat_with_llm函数
-            response = chat_with_llm(messages, llmType=self.llm_type, model=self.model)
+            response = chat_with_llm(messages, llmType=self.llm_type, model=current_model)
             
             # chat_with_llm返回的是JSON字符串，需要解析
             try:
@@ -572,13 +578,14 @@ class LLMService:
             # )
             raise error
     
-    async def simple_chat(self, user_input: str, conversation_history: Optional[List[Dict[str, Any]]] = None) -> str:
+    async def simple_chat(self, user_input: str, conversation_history: Optional[List[Dict[str, Any]]] = None, model: str = None) -> str:
         """
         简单聊天接口（非流式）
         
         Args:
             user_input: 用户输入
             conversation_history: 对话历史
+            model: 使用的模型（如果为None则使用默认模型）
             
         Returns:
             LLM回答
@@ -600,7 +607,7 @@ class LLMService:
             messages.append({"role": "user", "content": user_input})
             
             # 调用LLM
-            response = await self._call_llm(messages)
+            response = await self._call_llm(messages, model)
             return response
             
         except Exception as error:
