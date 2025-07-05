@@ -22,6 +22,7 @@ from typing import Optional, List, Dict, Any
 import json
 from utils.myLLM import interact_with_intent_agent
 from utils.smart_data_manager import smart_data_manager
+from utils.persona_prompts import get_persona_prompt, persona_manager
 
 # 创建全局聊天服务实例
 from services.chat_service import ChatService
@@ -56,9 +57,10 @@ async def chat_with_agent(request: ChatRequest):
         print(f"收到非流式聊天请求，用户ID: {request.user_id}")
         print(f"用户输入: {request.user_input}")
         
-        # 处理附加的引用数据
+        # 处理附加的引用数据和上下文
         enhanced_input = request.user_input
         references = []
+        context_data = None
         
         if request.attached_data and len(request.attached_data) > 0:
             print(f"发现附加数据: {len(request.attached_data)} 项")
@@ -68,6 +70,13 @@ async def chat_with_agent(request: ChatRequest):
             for i, data in enumerate(request.attached_data, 1):
                 data_type = data.get('type', 'unknown')
                 data_info = data.get('data', {})
+                
+                # 检测是否为上下文数据
+                if data_type == 'persona_context':
+                    context_data = data_info
+                    print(f"🎭 检测到人设上下文: {data_info.get('constructionPhase', 'unknown')}")
+                    continue
+                
                 reference_context += f"\n{i}. 数据类型: {data_type}\n"
                 reference_context += f"   数据内容: {str(data_info)}\n"
                 
@@ -83,25 +92,109 @@ async def chat_with_agent(request: ChatRequest):
             enhanced_input = request.user_input + reference_context
             print(f"增强输入长度: {len(enhanced_input)}")
         
-        response = await chat_service.simple_chat(
-            user_input=enhanced_input,
-            user_id=request.user_id,
-            model=request.model,
-            conversation_history=request.conversation_history
-        )
-        
-        return {
-            "status": "success",
-            "reply": response,
-            "final_answer": response,
-            "references": references,
-            "hasData": len(references) > 0,
-            "dataType": "note_reference" if len(references) > 0 else None,
-            "data": {
-                "type": "simple_chat",
-                "reference_count": len(references)
+            # 根据上下文获取对应的人设提示词
+            if context_data:
+                persona_prompt = get_persona_prompt(context_data, request.user_input)
+                print(f"🎭 使用场景化人设提示词: {persona_prompt}")
+                
+                # 使用人设化的聊天服务
+                response = await chat_service.simple_chat_with_persona(
+                    user_input=enhanced_input,
+                    user_id=request.user_id,
+                    model=request.model,
+                    conversation_history=request.conversation_history,
+                    persona_prompt=persona_prompt
+                )
+                
+                print(f"🎭 人设聊天服务返回结果: {type(response)}")
+                print(f"🎭 人设聊天响应内容: {response}")
+                print(f"🎭 人设聊天响应长度: {len(response) if response else 0}")
+                
+                # 解析AI返回的JSON结构化数据
+                structured_data = None
+                try:
+                    # 尝试解析AI返回的JSON
+                    import re
+                    
+                    # 首先尝试寻找JSON代码块
+                    json_code_block = re.search(r'```json\s*(\{.*?\})\s*```', response, re.DOTALL)
+                    if json_code_block:
+                        json_str = json_code_block.group(1)
+                        print(f"🎭 找到JSON代码块")
+                    else:
+                        # 如果没有代码块，寻找任何JSON对象
+                        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response, re.DOTALL)
+                        if json_match:
+                            json_str = json_match.group(0)
+                            print(f"🎭 找到JSON对象")
+                        else:
+                            json_str = None
+                            print("🎭 未找到JSON格式")
+                    
+                    if json_str:
+                        # 尝试解析JSON
+                        structured_data = json.loads(json_str)
+                        print(f"🎭 成功解析结构化数据")
+                        
+                        # 验证必要字段
+                        if not isinstance(structured_data, dict):
+                            print("🎭 JSON不是字典格式，忽略")
+                            structured_data = None
+                        elif 'questions' not in structured_data and 'message' not in structured_data:
+                            print("🎭 JSON缺少必要字段，忽略")
+                            structured_data = None
+                        else:
+                            print(f"🎭 JSON验证通过，包含字段: {list(structured_data.keys())}")
+                    
+                except json.JSONDecodeError as e:
+                    print(f"🎭 JSON解析失败: {e}")
+                    structured_data = None
+                except Exception as e:
+                    print(f"🎭 解析过程出错: {e}")
+                    structured_data = None
+                
+                # 返回人设化聊天的响应 - 简化响应结构，避免重复
+                result = {
+                    "status": "success",
+                    "reply": response,  # 始终包含原始响应
+                    "final_answer": response,
+                    "structured_data": structured_data,
+                    "references": references,
+                    "hasData": len(references) > 0,
+                    "dataType": "persona_chat",
+                    "data": {
+                        "type": "persona_chat",
+                        "reference_count": len(references),
+                        "persona_context": context_data.get('constructionPhase', 'unknown'),
+                        "structured_response": structured_data is not None,
+                        "has_questions": structured_data and 'questions' in structured_data,
+                        "questions_count": len(structured_data.get('questions', [])) if structured_data else 0
+                    }
+                }
+                
+                print(f"🎭 即将返回的完整结果: {result}")
+                return result
+        else:
+            # 使用默认聊天服务
+            response = await chat_service.simple_chat(
+                user_input=enhanced_input,
+                user_id=request.user_id,
+                model=request.model,
+                conversation_history=request.conversation_history
+            )
+            
+            return {
+                "status": "success",
+                "reply": response,
+                "final_answer": response,
+                "references": references,
+                "hasData": len(references) > 0,
+                "dataType": "note_reference" if len(references) > 0 else None,
+                "data": {
+                    "type": "simple_chat",
+                    "reference_count": len(references)
+                }
             }
-        }
         
     except Exception as e:
         print(f"非流式聊天处理出错: {str(e)}")

@@ -5,7 +5,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid
 
-from database.models import Content, Account
+from database.models import Content, PersonaDocument
 from schemas.content_schemas import ContentCreate, ContentUpdate, ContentResponse
 
 class ContentService:

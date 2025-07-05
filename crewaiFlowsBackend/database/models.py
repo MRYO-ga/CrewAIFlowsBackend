@@ -6,51 +6,39 @@ from sqlalchemy.sql import func
 from datetime import datetime
 from .database import Base
 
-# 账号管理模型
-class Account(Base):
-    __tablename__ = "accounts"
+# 人设构建文档模型
+class PersonaDocument(Base):
+    __tablename__ = "persona_documents"
 
     id = Column(String(50), primary_key=True)
-    name = Column(String(100), nullable=False)
-    platform = Column(String(20), nullable=False)  # xiaohongshu, douyin, etc.
-    account_id = Column(String(100), nullable=False)
-    avatar = Column(String(500))
-    status = Column(String(20), default="active")  # active, inactive
-    created_at = Column(String(50))
-    last_updated = Column(String(50))
+    account_name = Column(String(100), nullable=False, comment="账号名称")
+    document_content = Column(Text, nullable=False, comment="人设构建完整文档内容")
     
-    # 数据统计字段
-    followers = Column(Integer, default=0)
-    notes = Column(Integer, default=0)
-    engagement = Column(Float, default=0.0)
-    avg_views = Column(Integer, default=0)
-    verified = Column(Boolean, default=False)
-    content_count = Column(Integer, default=0)
+    # 基本信息（从文档中体现，不单独存储）
+    account_type = Column(String(50), comment="账号类型")
+    industry_field = Column(String(50), comment="行业领域")
+    platform = Column(String(20), default="xiaohongshu", comment="平台")
     
-    # 账号信息
-    bio = Column(Text)
-    tags = Column(JSON)  # 存储标签数组
+    # 状态信息
+    status = Column(String(20), default="completed", comment="状态: completed, archived")
     
-    # 目标受众信息
-    target_audience = Column(JSON)
+    # 时间信息
+    created_at = Column(DateTime, default=func.now(), comment="创建时间")
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
+    completed_at = Column(DateTime, default=func.now(), comment="完成时间")
     
-    # 账号定位
-    positioning = Column(JSON)
+    # 用户信息
+    user_id = Column(String(50), default="default_user", comment="用户ID")
     
-    # 内容策略
-    content_strategy = Column(JSON)
+    # 扩展信息
+    tags = Column(JSON, comment="标签列表")
+    summary = Column(Text, comment="简短摘要")
     
-    # 变现信息
-    monetization = Column(JSON)
-    
-    # 时间戳
-    created_at_timestamp = Column(DateTime, default=func.now())
-    updated_at_timestamp = Column(DateTime, default=func.now(), onupdate=func.now())
-
-    # 关系
-    contents = relationship("Content", back_populates="account")
-    schedules = relationship("Schedule", back_populates="account")
-    tasks = relationship("Task", back_populates="account")
+    # 索引
+    __table_args__ = (
+        Index('idx_persona_user_created', 'user_id', 'created_at'),
+        Index('idx_persona_account_name', 'account_name'),
+    )
 
 # 内容管理模型
 class Content(Base):
@@ -69,9 +57,9 @@ class Content(Base):
     created_at = Column(String(50))
     scheduled_at = Column(String(50))
     
-    # 关联账号
+    # 关联信息
     platform = Column(String(20))
-    account_id = Column(String(50), ForeignKey("accounts.id"))
+    account_name = Column(String(100), comment="账号名称")
     
     # 数据统计
     stats = Column(JSON)  # 包含views, likes, comments, shares, favorites
@@ -84,7 +72,6 @@ class Content(Base):
     updated_at_timestamp = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # 关系
-    account = relationship("Account", back_populates="contents")
     schedules = relationship("Schedule", back_populates="content")
     tasks = relationship("Task", back_populates="content")
 
@@ -152,7 +139,7 @@ class Schedule(Base):
     status = Column(String(50), nullable=False, default="pending", comment="状态: pending, running, published, completed, cancelled")
     
     # 关联信息
-    account_id = Column(String(50), ForeignKey("accounts.id"), comment="关联账号ID")
+    account_name = Column(String(100), comment="账号名称")
     content_id = Column(String(50), ForeignKey("contents.id"), comment="关联内容ID")
     platform = Column(String(50), comment="发布平台")
     
@@ -170,7 +157,6 @@ class Schedule(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
 
     # 关系
-    account = relationship("Account", back_populates="schedules")
     content = relationship("Content", back_populates="schedules")
     tasks = relationship("Task", back_populates="schedule")
 
@@ -200,7 +186,7 @@ class Analytics(Base):
     __tablename__ = "analytics"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    account_id = Column(String(50), ForeignKey("accounts.id"))
+    account_name = Column(String(100), comment="账号名称")
     date = Column(String(20), nullable=False)  # YYYY-MM-DD
     
     # 基础数据
@@ -218,9 +204,6 @@ class Analytics(Base):
     # 时间戳
     created_at_timestamp = Column(DateTime, default=func.now())
     updated_at_timestamp = Column(DateTime, default=func.now(), onupdate=func.now())
-
-    # 关系
-    account = relationship("Account", foreign_keys=[account_id])
 
 # 任务管理模型
 class Task(Base):
@@ -240,7 +223,7 @@ class Task(Base):
     progress = Column(Integer, default=0, comment="完成进度(0-100)")
     
     # 关联信息
-    account_id = Column(String(50), ForeignKey("accounts.id"), nullable=True, comment="关联账号ID")
+    account_name = Column(String(100), comment="账号名称")
     content_id = Column(String(50), ForeignKey("contents.id"), nullable=True, comment="关联内容ID")
     schedule_id = Column(String(50), ForeignKey("schedules.id"), nullable=True, comment="关联计划ID")
     
@@ -256,22 +239,16 @@ class Task(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
 
     # 关系
-    account = relationship("Account", back_populates="tasks")
     content = relationship("Content", back_populates="tasks")
     schedule = relationship("Schedule", back_populates="tasks")
 
 # 添加索引
-Index('idx_account_platform', Account.platform)
-Index('idx_account_status', Account.status)
-Index('idx_content_account_id', Content.account_id)
 Index('idx_content_status', Content.status)
 Index('idx_content_category', Content.category)
 Index('idx_competitor_platform', Competitor.platform)
 Index('idx_competitor_tier', Competitor.tier)
-Index('idx_schedule_account_id', Schedule.account_id)
 Index('idx_schedule_status', Schedule.status)
 Index('idx_chat_user_id', ChatMessage.user_id)
-Index('idx_analytics_account_date', Analytics.account_id, Analytics.date)
 
 # SOP模型 - 标准操作程序
 class SOP(Base):

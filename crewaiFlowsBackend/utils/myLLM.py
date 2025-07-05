@@ -255,7 +255,6 @@ def chat_with_llm(messages, llmType="openai", model=OPENAI_CHAT_MODEL):
                 
                 if response_data.get("choices") and len(response_data["choices"]) > 0:
                     content = response_data["choices"][0]["message"]["content"]
-                    print(f"获取到内容: {content[:100]}...")
                     
                     # 尝试解析为JSON
                     try:

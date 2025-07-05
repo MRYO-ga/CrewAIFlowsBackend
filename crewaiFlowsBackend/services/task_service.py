@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import uuid
 
-from database.models import Task, Account, Content, Schedule
+from database.models import Task, PersonaDocument, Content, Schedule
 from schemas.task_schemas import TaskCreate, TaskUpdate, TaskStats
 
 

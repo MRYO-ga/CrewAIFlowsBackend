@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import json
 
-from database.models import Account, Content, Competitor, Schedule, Task
+from database.models import PersonaDocument, Content, Competitor, Schedule, Task
 from schemas.analytics_schemas import (
     AnalyticsOverview,
     ContentAnalytics, 

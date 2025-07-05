@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import uuid
 
-from database.models import Schedule, Account, Content
+from database.models import Schedule, PersonaDocument, Content
 from schemas.schedule_schemas import ScheduleCreate, ScheduleUpdate, PublishResult, ScheduleStats
 
 

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from database.database import get_db
-from database.models import Account, Content, Competitor, Schedule, Task
+from database.models import PersonaDocument, Content, Competitor, Schedule, Task
 from services.analytics_service import AnalyticsService
 from schemas.analytics_schemas import (
     AnalyticsOverview, 

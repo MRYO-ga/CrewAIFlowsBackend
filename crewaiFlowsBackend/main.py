@@ -32,13 +32,13 @@ from pathlib import Path
 from database.database import create_tables
 # 导入所有模型以确保表被创建
 from database.models import (
-    Account, Content, Competitor, Task, Schedule, 
+    PersonaDocument, Content, Competitor, Task, Schedule, 
     ChatMessage, CompetitorNote, Analytics,
     SOP, SOPCycle, SOPWeek, SOPTask, SOPTaskItem,
     XhsNote, XhsSearchRecord, XhsApiLog
 )
 from api import (
-    accounts_router, 
+    accounts_router,  # 现在是人设管理路由
     contents_router, 
     competitors_router,
     schedules_router,
@@ -50,6 +50,7 @@ from api import (
 )
 from api.mcp_router import router as mcp_router
 from api.xhs import router as xhs_router
+from api.persona import persona_router
 
 
 # 服务访问的端口
@@ -97,6 +98,7 @@ app.add_middleware(
 )
 
 # 注册API路由
+app.include_router(persona_router)
 app.include_router(accounts_router)
 app.include_router(contents_router) 
 app.include_router(competitors_router)

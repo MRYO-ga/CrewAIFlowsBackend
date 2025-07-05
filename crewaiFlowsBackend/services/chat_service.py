@@ -152,6 +152,39 @@ class ChatService:
             self.logger.error(f"简单聊天失败: {error}")
             return f"抱歉，处理您的请求时发生了错误: {error}"
     
+    async def simple_chat_with_persona(self, user_input: str, user_id: str = "default", 
+                                     model: str = "gpt-4o-mini",
+                                     conversation_history: Optional[List[Dict[str, Any]]] = None,
+                                     persona_prompt: str = "") -> str:
+        """
+        带人设的简单聊天接口（非流式）
+        
+        Args:
+            user_input: 用户输入
+            user_id: 用户ID
+            model: 使用的AI模型
+            conversation_history: 对话历史
+            persona_prompt: 人设系统提示词
+            
+        Returns:
+            LLM回答
+        """
+        try:
+            # 确保MCP已连接
+            await self._ensure_mcp_connected()
+            
+            response = await self.llm_service.simple_chat_with_persona(
+                user_input, 
+                conversation_history, 
+                model, 
+                persona_prompt
+            )
+            return response
+            
+        except Exception as error:
+            self.logger.error(f"人设聊天失败: {error}")
+            return f"抱歉，处理您的请求时发生了错误: {error}"
+    
     async def get_mcp_status(self) -> Dict[str, Any]:
         """获取MCP连接状态"""
         try:

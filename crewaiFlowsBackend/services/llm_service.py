@@ -19,6 +19,7 @@ if str(utils_path) not in sys.path:
     sys.path.append(str(utils_path))
 
 from myLLM import chat_with_llm
+from persona_prompts import get_persona_prompt
 from pydantic import BaseModel
 
 from .tool_service import ToolService
@@ -612,4 +613,53 @@ class LLMService:
             
         except Exception as error:
             self.logger.error(f"简单聊天失败: {error}")
+            return f"抱歉，处理您的请求时发生了错误: {error}"
+    
+    async def simple_chat_with_persona(self, user_input: str, 
+                                     conversation_history: Optional[List[Dict[str, Any]]] = None, 
+                                     model: str = None,
+                                     persona_prompt: str = "") -> str:
+        """
+        带人设的简单聊天接口（非流式）
+        
+        Args:
+            user_input: 用户输入
+            conversation_history: 对话历史
+            model: 使用的模型
+            persona_prompt: 人设系统提示词
+            
+        Returns:
+            LLM回答
+        """
+        try:
+            # 构建对话历史，使用人设提示词作为系统消息
+            messages = []
+            
+            # 使用人设提示词或默认系统提示词
+            system_prompt = persona_prompt if persona_prompt else self.base_system_prompt
+            messages.append({"role": "system", "content": system_prompt})
+            
+            # 添加历史对话
+            if conversation_history:
+                for msg in conversation_history[-5:]:  # 只保留最近5轮对话
+                    if msg.get("role") in ["user", "assistant"]:
+                        messages.append({
+                            "role": msg["role"],
+                            "content": msg["content"]
+                        })
+            
+            # 添加当前用户输入
+            messages.append({"role": "user", "content": user_input})
+            
+            print(f"🎭 使用人设聊天，消息数量: {len(messages)}")
+            print(f"🎭 人设提示词: {system_prompt}")
+            
+            # 调用LLM
+            response = await self._call_llm(messages, model)
+            print(f"🎭 人设聊天响应: {response}， messages: {messages}")
+
+            return response
+            
+        except Exception as error:
+            self.logger.error(f"人设聊天失败: {error}")
             return f"抱歉，处理您的请求时发生了错误: {error}" 
