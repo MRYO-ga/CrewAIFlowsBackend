@@ -101,14 +101,14 @@ class PersonaManager:
       "id": "question1",
       "title": "问题1标题",
       "description": "问题1的详细说明",
-      "options": [
-        {
+  "options": [
+    {
           "id": "q1_option1",
           "title": "选择A",
           "description": "选择A的详细说明，包含具体例子",
           "example": "具体的表达示例"
-        },
-        {
+    },
+    {
           "id": "q1_option2",
           "title": "选择B",
           "description": "选择B的详细说明，包含具体例子",
@@ -119,7 +119,7 @@ class PersonaManager:
           "title": "选择C",
           "description": "选择C的详细说明，包含具体例子",
           "example": "具体的表达示例"
-        }
+    }
       ]
     },
     {
@@ -144,7 +144,7 @@ class PersonaManager:
           "title": "选择C",
           "description": "选择C的详细说明，包含具体例子",
           "example": "具体的表达示例"
-        }
+  }
       ]
     }
   ]

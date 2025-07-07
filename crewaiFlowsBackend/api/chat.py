@@ -74,8 +74,7 @@ async def chat_with_agent(request: ChatRequest):
                 # 检测是否为上下文数据
                 if data_type == 'persona_context':
                     context_data = data_info
-                    print(f"🎭 检测到人设上下文: {data_info.get('constructionPhase', 'unknown')}")
-                    continue
+                    print(f"🎭 检测到人设上下文: {data_info.get('title', 'unknown')}")
                 
                 reference_context += f"\n{i}. 数据类型: {data_type}\n"
                 reference_context += f"   数据内容: {str(data_info)}\n"
@@ -115,26 +114,26 @@ async def chat_with_agent(request: ChatRequest):
                 try:
                     # 尝试解析AI返回的JSON
                     import re
+                    json_str = None
                     
                     # 首先尝试寻找JSON代码块
                     json_code_block = re.search(r'```json\s*(\{.*?\})\s*```', response, re.DOTALL)
                     if json_code_block:
                         json_str = json_code_block.group(1)
-                        print(f"🎭 找到JSON代码块")
+                        print("🎭 找到JSON代码块")
                     else:
                         # 如果没有代码块，寻找任何JSON对象
                         json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response, re.DOTALL)
                         if json_match:
                             json_str = json_match.group(0)
-                            print(f"🎭 找到JSON对象")
+                            print("🎭 找到JSON对象")
                         else:
-                            json_str = None
                             print("🎭 未找到JSON格式")
                     
+                    # 解析JSON字符串
                     if json_str:
-                        # 尝试解析JSON
                         structured_data = json.loads(json_str)
-                        print(f"🎭 成功解析结构化数据")
+                        print("🎭 成功解析结构化数据")
                         
                         # 验证必要字段
                         if not isinstance(structured_data, dict):
@@ -145,7 +144,7 @@ async def chat_with_agent(request: ChatRequest):
                             structured_data = None
                         else:
                             print(f"🎭 JSON验证通过，包含字段: {list(structured_data.keys())}")
-                    
+                
                 except json.JSONDecodeError as e:
                     print(f"🎭 JSON解析失败: {e}")
                     structured_data = None
@@ -438,127 +437,6 @@ async def get_chat_context(user_id: str):
             "error": str(e),
             "context": {}
         }
-
-# 占位符接口
-@chat_router.get("/chat/history")
-async def get_chat_history():
-    """获取聊天历史（待实现）"""
-    return {"message": "聊天历史功能开发中"}
-
-@chat_router.post("/chat/save")
-async def save_message():
-    """保存聊天消息（待实现）"""
-    return {"message": "消息保存功能开发中"}
-
-
-@chat_router.get("/chat/references/{user_id}")
-async def get_user_references(
-    user_id: str, 
-    limit: int = Query(20, ge=1, le=100), 
-    search: Optional[str] = Query(None)
-):
-    """获取用户的引用数据，供@功能使用"""
-    try:
-        from services.mcp_cache_service import mcp_cache_service
-        
-        # 获取笔记数据
-        notes = await mcp_cache_service.get_user_notes(user_id, limit)
-        
-        # 如果有搜索关键词，进行过滤
-        if search:
-            search_lower = search.lower()
-            notes = [
-                note for note in notes
-                if (note.get('title', '').lower().find(search_lower) >= 0 or
-                    note.get('content', '').lower().find(search_lower) >= 0 or
-                    note.get('author_name', '').lower().find(search_lower) >= 0)
-            ]
-        
-        # 转换为引用格式
-        references = []
-        for note in notes:
-            references.append({
-                "id": note.get('note_id', ''),
-                "type": "note",
-                "name": note.get('title', '无标题'),
-                "subInfo": f"作者：{note.get('author_name', '未知')} | 点赞：{note.get('likes_count', 0)}",
-                "data": note
-            })
-        
-        return {
-            "status": "success",
-            "data": {
-                "references": references,
-                "total": len(references),
-                "user_id": user_id
-            }
-        }
-        
-    except Exception as e:
-        print(f"获取引用数据失败: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"获取引用数据失败: {str(e)}")
-
-
-@chat_router.get("/chat/reference-categories/{user_id}")
-async def get_reference_categories(user_id: str):
-    """获取引用数据的分类，供侧边栏展示使用"""
-    try:
-        from services.mcp_cache_service import mcp_cache_service
-        
-        # 获取用户数据
-        notes = await mcp_cache_service.get_user_notes(user_id, 100)
-        searches = await mcp_cache_service.get_user_searches(user_id, 20)
-        
-        categories = []
-        
-        # 笔记分类
-        if notes:
-            note_items = []
-            for note in notes[:20]:  # 限制显示数量
-                note_items.append({
-                    "type": "note",
-                    "name": note.get('title', '无标题'),
-                    "subInfo": f"作者：{note.get('author_name', '未知')} | 点赞：{note.get('likes_count', 0)}",
-                    "data": note
-                })
-            
-            categories.append({
-                "title": "笔记数据",
-                "icon": "FileTextOutlined",
-                "items": note_items,
-                "total": len(notes)
-            })
-        
-        # 搜索历史分类
-        if searches:
-            search_items = []
-            for search in searches[:10]:  # 限制显示数量
-                search_items.append({
-                    "type": "search",
-                    "name": search.get('keywords', ''),
-                    "subInfo": f"结果：{search.get('total_count', 0)} 条",
-                    "data": search
-                })
-            
-            categories.append({
-                "title": "搜索历史",
-                "icon": "SearchOutlined", 
-                "items": search_items,
-                "total": len(searches)
-            })
-        
-        return {
-            "status": "success",
-            "data": {
-                "categories": categories,
-                "user_id": user_id
-            }
-        }
-        
-    except Exception as e:
-        print(f"获取引用分类失败: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"获取引用分类失败: {str(e)}") 
-
 
 @chat_router.get("/chat/available-models")
 async def get_available_models():

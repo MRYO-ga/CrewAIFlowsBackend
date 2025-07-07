@@ -104,13 +104,16 @@ class XhsService:
                     # 获取笔记标题
                     display_title = note_card.get('display_title', '')
                     title = note_card.get('title', display_title)
+                    desc = note_card.get('desc', '')
                     print(f"🗄️ [XhsService] 笔记标题: {display_title}")
+                    print(f"🗄️ [XhsService] 笔记内容: {desc[:100]}...")
                     
                     # 创建新笔记记录
                     note = XhsNote(
                         id=note_id,
                         display_title=display_title[:500] if display_title else '',  # 限制长度
                         title=title[:500] if title else '',  # 限制长度
+                        desc=desc[:5000] if desc else '',  # 限制描述长度
                         content=str(note_card.get('content', ''))[:5000],  # 限制内容长度
                         note_type=str(note_card.get('type', 'normal')),
                         model_type=str(note_item.get('model_type', 'note')),
@@ -330,7 +333,7 @@ class XhsService:
             
             # 计算数据条数
             data_count = 0
-            if response_data and 'data' in response_data:
+            if response_data and 'data' in response_data and response_data['data']:
                 if 'items' in response_data['data']:
                     data_count = len(response_data['data']['items'])
                 elif 'comments' in response_data['data']:
@@ -409,6 +412,7 @@ class XhsService:
                     'id': note.id,
                     'display_title': note.display_title,
                     'title': note.title,
+                    'desc': note.desc,
                     'content': note.content[:200] + '...' if len(note.content) > 200 else note.content,
                     'user_nickname': note.user_nickname,
                     'user_avatar': note.user_avatar,
@@ -462,6 +466,7 @@ class XhsService:
                 'id': note.id,
                 'display_title': note.display_title,
                 'title': note.title,
+                'desc': note.desc,
                 'content': note.content,
                 'note_type': note.note_type,
                 'user_id': note.user_id,
@@ -540,4 +545,188 @@ class XhsService:
             return {}
         finally:
             if 'db' in locals():
-                db.close() 
+                db.close()
+    
+    async def process_note_data_response(self, api_response: Dict[str, Any], source: str = "api", 
+                                       search_keyword: str = None) -> Dict[str, Any]:
+        """
+        通用笔记数据处理方法，支持搜索接口和笔记内容接口
+        
+        Args:
+            api_response: API返回的笔记数据
+            source: 数据来源 (api, search, home_feed)
+            search_keyword: 搜索关键词（如果来源是搜索）
+            
+        Returns:
+            处理结果，包含AI友好的数据和保存状态
+        """
+        print(f"🔍 [XhsService] 开始处理笔记数据响应，来源: {source}")
+        
+        try:
+            # 解析响应数据
+            if isinstance(api_response, str):
+                api_response = json.loads(api_response)
+            
+            # 检查响应状态
+            if not api_response.get('success', False):
+                error_msg = api_response.get('msg', '未知错误')
+                print(f"❌ [XhsService] API响应失败: {error_msg}")
+                return {
+                    "success": False,
+                    "error": error_msg,
+                    "ai_data": None,
+                    "saved_count": 0
+                }
+            
+            # 提取数据 - 支持不同的数据结构
+            response_data = api_response.get('data', {})
+            items = response_data.get('items', [])
+            
+            if not items:
+                print("⚠️ [XhsService] 没有找到笔记数据")
+                return {
+                    "success": True,
+                    "ai_data": {
+                        "success": True,
+                        "total_items": 0,
+                        "notes": [],
+                        "message": "没有找到笔记数据"
+                    },
+                    "saved_count": 0
+                }
+            
+            print(f"🔍 [XhsService] 找到 {len(items)} 个笔记项目")
+            
+            # 保存到数据库
+            save_result = await self.save_note_data(api_response, source=source, search_keyword=search_keyword)
+            saved_count = save_result.get("saved_count", 0)
+            saved_note_ids = save_result.get("note_ids", [])
+            
+            # 为AI提取关键信息
+            ai_notes = []
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                    
+                note_card = item.get('note_card', {})
+                if not note_card:
+                    continue
+                
+                # 提取用户信息
+                user_info = note_card.get('user', {})
+                user_data = {
+                    'nickname': user_info.get('nickname', user_info.get('nick_name', '')),
+                    'user_id': user_info.get('user_id', ''),
+                    'xsec_token': user_info.get('xsec_token', '')  # 保留供AI调用其他接口
+                }
+                
+                # 提取互动信息
+                interact_info = note_card.get('interact_info', {})
+                interaction_data = {
+                    'liked_count': self._safe_int(interact_info.get('liked_count', 0)),
+                    'comment_count': self._safe_int(interact_info.get('comment_count', 0)),
+                    'collected_count': self._safe_int(interact_info.get('collected_count', 0)),
+                    'shared_count': self._safe_int(interact_info.get('shared_count', 0)),
+                    'liked': interact_info.get('liked', False),
+                    'collected': interact_info.get('collected', False)
+                }
+                
+                # 提取图片信息
+                image_list = note_card.get('image_list', [])
+                image_count = len(image_list) if isinstance(image_list, list) else 0
+                
+                # 提取标签信息
+                tag_list = note_card.get('tag_list', [])
+                tags = [tag.get('name', '') for tag in tag_list if isinstance(tag, dict) and tag.get('name')]
+                
+                # 提取发布时间
+                corner_tag_info = note_card.get('corner_tag_info', [])
+                publish_time = ''
+                for tag in corner_tag_info:
+                    if isinstance(tag, dict) and tag.get('type') == 'publish_time':
+                        publish_time = tag.get('text', '')
+                        break
+                
+                # 构建AI友好的笔记信息
+                note_info = {
+                    'id': item.get('id', ''),
+                    'title': note_card.get('title', note_card.get('display_title', '')),
+                    'desc': note_card.get('desc', ''),
+                    'type': note_card.get('type', ''),
+                    'model_type': item.get('model_type', ''),
+                    'user': user_data,
+                    'interactions': interaction_data,
+                    'image_count': image_count,
+                    'tags': tags,
+                    'publish_time': publish_time,
+                    'time': item.get('time', 0),
+                    'ip_location': note_card.get('ip_location', ''),
+                    'saved_to_db': item.get('id', '') in saved_note_ids
+                }
+                
+                ai_notes.append(note_info)
+            
+            # 构建AI友好的数据结构
+            ai_data = {
+                'success': True,
+                'total_items': len(items),
+                'saved_count': saved_count,
+                'current_time': response_data.get('current_time', 0),
+                'cursor_score': response_data.get('cursor_score', ''),
+                'has_more': response_data.get('has_more', False),
+                'notes': ai_notes,
+                'data_source': source,
+                'search_keyword': search_keyword,
+                'processing_time': datetime.now().isoformat()
+            }
+            
+            print(f"✅ [XhsService] 笔记数据处理完成")
+            print(f"   - 总笔记数: {len(items)}")
+            print(f"   - 保存到数据库: {saved_count}")
+            print(f"   - 提供给AI: {len(ai_notes)}")
+            print(f"   - 数据来源: {source}")
+            if search_keyword:
+                print(f"   - 搜索关键词: {search_keyword}")
+            
+            return {
+                "success": True,
+                "ai_data": ai_data,
+                "saved_count": saved_count,
+                "saved_note_ids": saved_note_ids
+            }
+            
+        except Exception as e:
+            print(f"❌ [XhsService] 处理笔记数据响应失败: {e}")
+            import traceback
+            print(f"❌ [XhsService] 错误堆栈: {traceback.format_exc()}")
+            logger.error(f"处理笔记数据响应失败: {e}")
+            
+            return {
+                "success": False,
+                "error": str(e),
+                "ai_data": None,
+                "saved_count": 0
+            }
+
+    async def process_note_content_response(self, api_response: Dict[str, Any], source: str = "api") -> Dict[str, Any]:
+        """
+        处理笔记内容的返回接口（保持向后兼容）
+        
+        Args:
+            api_response: API返回的笔记内容数据
+            source: 数据来源
+            
+        Returns:
+            处理结果，包含AI友好的数据和保存状态
+        """
+        return await self.process_note_data_response(api_response, source=source)
+
+    def _safe_int(self, value) -> int:
+        """安全转换为整数"""
+        try:
+            if isinstance(value, str):
+                # 移除逗号等分隔符
+                value = value.replace(',', '').replace('，', '')
+            return int(value) if value else 0
+        except (ValueError, TypeError):
+            return 0 

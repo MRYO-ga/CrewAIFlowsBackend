@@ -130,8 +130,15 @@ class XhsMCPWrapperService:
             )
             print(f"📊 [XHS包装器] API日志保存结果: {api_log_result}")
             
-            # 为AI提供精简的数据（移除URL、token等冗余信息）
+            # 为AI提供精简的数据
+            # 如果已经有处理后的AI数据，直接使用
+            if 'ai_data' in saved_data and saved_data['ai_data']:
+                clean_content = json.dumps(saved_data['ai_data'], ensure_ascii=False, indent=2)
+                print(f"🤖 [XHS包装器] 使用处理后的AI数据")
+            else:
+                # 否则使用原有的清理方法
             clean_content = self._clean_content_for_ai(api_response)
+                print(f"🤖 [XHS包装器] 使用原有清理方法")
             
             # 打印给AI的清理后数据
             print(f"🤖 [XHS包装器] 给AI的清理后数据:")
@@ -213,31 +220,44 @@ class XhsMCPWrapperService:
         try:
             if tool_name == 'home_feed':
                 print(f"🏠 [XHS数据保存] 处理首页推荐笔记...")
-                # 保存首页推荐笔记
-                save_result = await self.xhs_service.save_note_data(
+                # 使用通用处理方法
+                process_result = await self.xhs_service.process_note_data_response(
                     api_response, 
                     source="home_feed"
                 )
-                print(f"🏠 [XHS数据保存] 首页推荐笔记保存完成，结果: {save_result}")
-                save_info["saved_items"] = save_result.get("note_ids", [])
-                save_info["count"] = save_result.get("saved_count", 0)
-                save_info["type"] = "notes"
+                
+                if process_result.get("success", False):
+                    save_info["saved_items"] = process_result.get("saved_note_ids", [])
+                    save_info["count"] = process_result.get("saved_count", 0)
+                    save_info["type"] = "home_feed"
+                    save_info["ai_data"] = process_result.get("ai_data")
+                    print(f"✅ [XHS数据保存] 首页推荐处理成功，保存 {save_info['count']} 条记录")
+                else:
+                    save_info["error"] = process_result.get("error", "处理失败")
+                    save_info["type"] = "home_feed_error"
+                    print(f"❌ [XHS数据保存] 首页推荐处理失败: {save_info['error']}")
                 
             elif tool_name == 'search_notes':
                 print(f"🔍 [XHS数据保存] 处理搜索笔记结果...")
-                # 保存搜索笔记结果
                 keywords = tool_args.get('keywords', '')
                 print(f"🔍 [XHS数据保存] 搜索关键词: {keywords}")
                 
-                save_result = await self.xhs_service.save_note_data(
+                # 使用通用处理方法
+                process_result = await self.xhs_service.process_note_data_response(
                     api_response, 
                     source="search", 
                     search_keyword=keywords
                 )
-                print(f"🔍 [XHS数据保存] 搜索笔记保存完成，结果: {save_result}")
+                
+                if process_result.get("success", False):
+                    save_info["saved_items"] = process_result.get("saved_note_ids", [])
+                    save_info["count"] = process_result.get("saved_count", 0)
+                    save_info["type"] = "search"
+                    save_info["ai_data"] = process_result.get("ai_data")
+                    save_info["keywords"] = keywords
                 
                 # 保存搜索记录
-                result_count = save_result.get("saved_count", 0)
+                    result_count = save_info["count"]
                 has_more = api_response.get('data', {}).get('has_more', False)
                 print(f"🔍 [XHS数据保存] 准备保存搜索记录: 结果数量={result_count}, 是否还有更多={has_more}")
                 
@@ -247,22 +267,32 @@ class XhsMCPWrapperService:
                     has_more=has_more
                 )
                 print(f"🔍 [XHS数据保存] 搜索记录保存完成，ID: {search_record_id}")
-                
-                save_info["saved_items"] = save_result.get("note_ids", [])
-                save_info["count"] = save_result.get("saved_count", 0)
-                save_info["type"] = "notes"
                 save_info["search_record_id"] = search_record_id
-                save_info["keywords"] = keywords
+                    
+                    print(f"✅ [XHS数据保存] 搜索笔记处理成功，保存 {save_info['count']} 条记录")
+                else:
+                    save_info["error"] = process_result.get("error", "处理失败")
+                    save_info["type"] = "search_error"
+                    print(f"❌ [XHS数据保存] 搜索笔记处理失败: {save_info['error']}")
                 
             elif tool_name == 'get_note_content':
-                # 保存笔记详细内容
-                save_result = await self.xhs_service.save_note_data(
+                # 使用新的处理方法处理笔记内容
+                print(f"🔍 [XHS数据保存] 处理笔记内容响应...")
+                process_result = await self.xhs_service.process_note_content_response(
                     api_response, 
                     source="api"
                 )
-                save_info["saved_items"] = save_result.get("note_ids", [])
-                save_info["count"] = save_result.get("saved_count", 0)
+                
+                if process_result.get("success", False):
+                    save_info["saved_items"] = process_result.get("saved_note_ids", [])
+                    save_info["count"] = process_result.get("saved_count", 0)
                 save_info["type"] = "note_detail"
+                    save_info["ai_data"] = process_result.get("ai_data")
+                    print(f"✅ [XHS数据保存] 笔记内容处理成功，保存 {save_info['count']} 条记录")
+                else:
+                    save_info["error"] = process_result.get("error", "处理失败")
+                    save_info["type"] = "note_detail_error"
+                    print(f"❌ [XHS数据保存] 笔记内容处理失败: {save_info['error']}")
                 
             elif tool_name in ['get_note_comments', 'post_comment']:
                 # 评论功能已移除
@@ -296,9 +326,10 @@ class XhsMCPWrapperService:
             import json
             
             # 需要移除的字段（URL、token等）
+            # 注意：保留xsec_token，因为AI需要它来调用get_note_content和get_note_comments
             url_fields = [
                 'url', 'avatar', 'image', 'cover', 'url_default', 'url_pre', 
-                'xsec_token', 'token', 'link', 'href', 'src'
+                'token', 'link', 'href', 'src'
             ]
             
             def clean_dict(obj):
@@ -306,6 +337,10 @@ class XhsMCPWrapperService:
                 if isinstance(obj, dict):
                     cleaned = {}
                     for key, value in obj.items():
+                        # 特殊处理：保留xsec_token字段
+                        if key == 'xsec_token':
+                            cleaned[key] = value
+                            continue
                         # 跳过URL相关字段
                         if any(field in key.lower() for field in url_fields):
                             continue
@@ -341,7 +376,8 @@ class XhsMCPWrapperService:
                             'type': note_card.get('type', ''),
                             'user': {
                                 'nickname': note_card.get('user', {}).get('nickname', ''),
-                                'user_id': note_card.get('user', {}).get('user_id', '')
+                                'user_id': note_card.get('user', {}).get('user_id', ''),
+                                'xsec_token': note_card.get('user', {}).get('xsec_token', '')  # 保留xsec_token供AI使用
                             },
                             'interactions': {
                                 'liked_count': note_card.get('interact_info', {}).get('liked_count', 0),

@@ -133,12 +133,36 @@ class MultiMCPClientService:
                         print(f"🐍 Python解释器: {sys.executable}")
                         
                         # 4. 启动子进程运行MCP服务器
+                        # 设置环境变量，确保 Node.js 可访问
+                        env = os.environ.copy()
+                        
+                        # 确保 Node.js 路径在 PATH 中
+                        node_paths = [
+                            r"C:\Program Files\nodejs",
+                            r"C:\Program Files (x86)\nodejs",
+                            os.path.expanduser("~/AppData/Roaming/npm"),
+                            os.path.expanduser("~/AppData/Local/Programs/nodejs")
+                        ]
+                        
+                        current_path = env.get('PATH', '')
+                        for node_path in node_paths:
+                            if os.path.exists(node_path) and node_path not in current_path:
+                                env['PATH'] = f"{node_path};{current_path}"
+                                print(f"🔧 添加 Node.js 路径到环境变量: {node_path}")
+                        
+                        # 设置其他可能需要的环境变量
+                        env.setdefault('PYTHONIOENCODING', 'utf-8')
+                        env.setdefault('PYTHONUNBUFFERED', '1')
+                        
+                        print(f"📡 连接到服务器: {sys.executable} {script_path}")
+                        
                         await self.client.connect_to_server(
                             server_name,
                             transport="stdio",
                             command=sys.executable,  # Python解释器路径
                             args=[script_path],      # MCP服务器脚本路径
-                            encoding_error_handler=server_config.get("encoding_error_handler", "ignore")
+                            encoding_error_handler=server_config.get("encoding_error_handler", "ignore"),
+                            env=env  # 传递环境变量
                         )
                         
                         self.connected_servers[server_name] = True

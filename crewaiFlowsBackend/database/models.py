@@ -33,7 +33,7 @@ class PersonaDocument(Base):
     # 扩展信息
     tags = Column(JSON, comment="标签列表")
     summary = Column(Text, comment="简短摘要")
-    
+
     # 索引
     __table_args__ = (
         Index('idx_persona_user_created', 'user_id', 'created_at'),
@@ -181,30 +181,6 @@ class ChatMessage(Base):
     # 时间戳
     created_at_timestamp = Column(DateTime, default=func.now())
 
-# 运营数据统计模型
-class Analytics(Base):
-    __tablename__ = "analytics"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    account_name = Column(String(100), comment="账号名称")
-    date = Column(String(20), nullable=False)  # YYYY-MM-DD
-    
-    # 基础数据
-    views = Column(Integer, default=0)
-    likes = Column(Integer, default=0)
-    comments = Column(Integer, default=0)
-    shares = Column(Integer, default=0)
-    followers_gained = Column(Integer, default=0)
-    engagement_rate = Column(Float, default=0.0)
-    
-    # 内容数据
-    content_published = Column(Integer, default=0)
-    content_type_breakdown = Column(JSON)  # 内容类型分布
-    
-    # 时间戳
-    created_at_timestamp = Column(DateTime, default=func.now())
-    updated_at_timestamp = Column(DateTime, default=func.now(), onupdate=func.now())
-
 # 任务管理模型
 class Task(Base):
     """任务管理模型"""
@@ -347,6 +323,7 @@ class XhsNote(Base):
     id = Column(String(100), primary_key=True, comment="笔记ID")
     display_title = Column(String(500), comment="显示标题")
     title = Column(String(500), comment="笔记标题")
+    desc = Column(Text, comment="笔记内容")
     content = Column(Text, comment="笔记内容")
     note_type = Column(String(50), default="normal", comment="笔记类型")
     model_type = Column(String(50), default="note", comment="模型类型")

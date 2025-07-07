@@ -33,7 +33,7 @@ from database.database import create_tables
 # 导入所有模型以确保表被创建
 from database.models import (
     PersonaDocument, Content, Competitor, Task, Schedule, 
-    ChatMessage, CompetitorNote, Analytics,
+    ChatMessage, CompetitorNote,
     SOP, SOPCycle, SOPWeek, SOPTask, SOPTaskItem,
     XhsNote, XhsSearchRecord, XhsApiLog
 )
@@ -43,7 +43,6 @@ from api import (
     competitors_router,
     schedules_router,
     chat_router,
-    analytics_router,
     crew_router,
     tasks_router,
     sops_router
@@ -104,7 +103,6 @@ app.include_router(contents_router)
 app.include_router(competitors_router)
 app.include_router(schedules_router)
 app.include_router(chat_router)
-app.include_router(analytics_router)
 app.include_router(crew_router)
 app.include_router(tasks_router)
 app.include_router(sops_router)
