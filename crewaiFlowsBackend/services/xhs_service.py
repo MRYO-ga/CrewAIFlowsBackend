@@ -64,7 +64,7 @@ class XhsService:
             saved_note_ids = []
             
             for i, note_item in enumerate(notes_list, 1):
-                print(f"🗄️ [XhsService] 处理第 {i} 个笔记项目")
+                # print(f"🗄️ [XhsService] 处理第 {i} 个笔记项目")
                 
                 # 创建新的数据库会话，避免会话回滚问题
                 db = SessionLocal()
@@ -76,7 +76,7 @@ class XhsService:
                         print(f"❌ [XhsService] 笔记项目不是字典类型，跳过")
                         continue
                     
-                    print(f"🔍 [XhsService] 笔记项目键: {list(note_item.keys())}")
+                    # print(f"🔍 [XhsService] 笔记项目键: {list(note_item.keys())}")
                     
                     # 获取笔记ID
                     note_id = note_item.get('id', '')
@@ -84,12 +84,12 @@ class XhsService:
                         print("⚠️ [XhsService] 笔记ID为空，跳过")
                         continue
                     
-                    print(f"🗄️ [XhsService] 笔记ID: {note_id}")
+                    # print(f"🗄️ [XhsService] 笔记ID: {note_id}")
                     
                     # 检查笔记是否已存在
                     existing_note = db.query(XhsNote).filter(XhsNote.id == note_id).first()
                     if existing_note:
-                        print(f"🔄 [XhsService] 笔记 {note_id} 已存在，跳过")
+                        # print(f"🔄 [XhsService] 笔记 {note_id} 已存在，跳过")
                         saved_note_ids.append(note_id)
                         continue
                     
@@ -99,14 +99,14 @@ class XhsService:
                         print(f"⚠️ [XhsService] note_card字段缺失或格式错误，跳过")
                         continue
                     
-                    print(f"🔍 [XhsService] note_card键: {list(note_card.keys())}")
+                    # print(f"🔍 [XhsService] note_card键: {list(note_card.keys())}")
                     
                     # 获取笔记标题
                     display_title = note_card.get('display_title', '')
                     title = note_card.get('title', display_title)
                     desc = note_card.get('desc', '')
-                    print(f"🗄️ [XhsService] 笔记标题: {display_title}")
-                    print(f"🗄️ [XhsService] 笔记内容: {desc[:100]}...")
+                    # print(f"🗄️ [XhsService] 笔记标题: {display_title}")
+                    # print(f"🗄️ [XhsService] 笔记内容: {desc[:100]}...")
                     
                     # 创建新笔记记录
                     note = XhsNote(
@@ -156,7 +156,7 @@ class XhsService:
                         note.liked = bool(interact_info.get('liked', False))
                         note.collected = bool(interact_info.get('collected', False))
                         
-                        print(f"🗄️ [XhsService] 互动数据: 点赞{note.liked_count} 评论{note.comment_count} 收藏{note.collected_count}")
+                        # print(f"🗄️ [XhsService] 互动数据: 点赞{note.liked_count} 评论{note.comment_count} 收藏{note.collected_count}")
                     
                     # 封面图片信息 - 从note_card.cover中获取
                     cover_info = note_card.get('cover', {})
@@ -175,7 +175,7 @@ class XhsService:
                         except (ValueError, TypeError):
                             note.cover_width = 0
                         
-                        print(f"🗄️ [XhsService] 封面信息: {note.cover_width}x{note.cover_height}")
+                        # print(f"🗄️ [XhsService] 封面信息: {note.cover_width}x{note.cover_height}")
                     
                     # 图片列表 - 从note_card.image_list中获取，确保是JSON可序列化的
                     image_list = note_card.get('image_list', [])
@@ -617,8 +617,10 @@ class XhsService:
                 user_data = {
                     'nickname': user_info.get('nickname', user_info.get('nick_name', '')),
                     'user_id': user_info.get('user_id', ''),
-                    'xsec_token': user_info.get('xsec_token', '')  # 保留供AI调用其他接口
                 }
+                
+                # 使用笔记级别的xsec_token，而不是用户的xsec_token
+                note_xsec_token = item.get('xsec_token', '')
                 
                 # 提取互动信息
                 interact_info = note_card.get('interact_info', {})
@@ -654,6 +656,7 @@ class XhsService:
                     'desc': note_card.get('desc', ''),
                     'type': note_card.get('type', ''),
                     'model_type': item.get('model_type', ''),
+                    'xsec_token': note_xsec_token,  # 使用笔记级别的xsec_token
                     'user': user_data,
                     'interactions': interaction_data,
                     'image_count': image_count,

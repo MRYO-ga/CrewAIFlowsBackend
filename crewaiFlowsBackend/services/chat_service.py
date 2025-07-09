@@ -108,7 +108,7 @@ class ChatService:
             await self._ensure_mcp_connected()
             
             # 开始流式处理
-            async for chunk in self.llm_service.process_message_stream(user_input, conversation_history, model):
+            async for chunk in self.llm_service.process_message_stream(user_input, conversation_history, model, attached_data):
                 # 转换为API响应格式
                 yield {
                     "type": chunk.type,

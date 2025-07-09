@@ -137,7 +137,7 @@ class XhsMCPWrapperService:
                 print(f"🤖 [XHS包装器] 使用处理后的AI数据")
             else:
                 # 否则使用原有的清理方法
-            clean_content = self._clean_content_for_ai(api_response)
+                clean_content = self._clean_content_for_ai(api_response)
                 print(f"🤖 [XHS包装器] 使用原有清理方法")
             
             # 打印给AI的清理后数据
@@ -159,8 +159,6 @@ class XhsMCPWrapperService:
                 }
             )
             
-            print(f"✅ [XHS包装器] 小红书工具 {tool_name} 数据保存完成: {saved_data}")
-            print(f"✅ 小红书工具 {tool_name} 数据保存完成: {saved_data}")
             return enhanced_result
             
         except Exception as e:
@@ -256,18 +254,18 @@ class XhsMCPWrapperService:
                     save_info["ai_data"] = process_result.get("ai_data")
                     save_info["keywords"] = keywords
                 
-                # 保存搜索记录
+                    # 保存搜索记录
                     result_count = save_info["count"]
-                has_more = api_response.get('data', {}).get('has_more', False)
-                print(f"🔍 [XHS数据保存] 准备保存搜索记录: 结果数量={result_count}, 是否还有更多={has_more}")
-                
-                search_record_id = await self.xhs_service.save_search_record(
-                    keyword=keywords,
-                    result_count=result_count,
-                    has_more=has_more
-                )
-                print(f"🔍 [XHS数据保存] 搜索记录保存完成，ID: {search_record_id}")
-                save_info["search_record_id"] = search_record_id
+                    has_more = api_response.get('data', {}).get('has_more', False)
+                    print(f"🔍 [XHS数据保存] 准备保存搜索记录: 结果数量={result_count}, 是否还有更多={has_more}")
+                    
+                    search_record_id = await self.xhs_service.save_search_record(
+                        keyword=keywords,
+                        result_count=result_count,
+                        has_more=has_more
+                    )
+                    print(f"🔍 [XHS数据保存] 搜索记录保存完成，ID: {search_record_id}")
+                    save_info["search_record_id"] = search_record_id
                     
                     print(f"✅ [XHS数据保存] 搜索笔记处理成功，保存 {save_info['count']} 条记录")
                 else:
@@ -286,7 +284,7 @@ class XhsMCPWrapperService:
                 if process_result.get("success", False):
                     save_info["saved_items"] = process_result.get("saved_note_ids", [])
                     save_info["count"] = process_result.get("saved_count", 0)
-                save_info["type"] = "note_detail"
+                    save_info["type"] = "note_detail"
                     save_info["ai_data"] = process_result.get("ai_data")
                     print(f"✅ [XHS数据保存] 笔记内容处理成功，保存 {save_info['count']} 条记录")
                 else:
@@ -326,7 +324,7 @@ class XhsMCPWrapperService:
             import json
             
             # 需要移除的字段（URL、token等）
-            # 注意：保留xsec_token，因为AI需要它来调用get_note_content和get_note_comments
+            # 注意：保留笔记级别的xsec_token，因为AI需要它来调用get_note_content和get_note_comments
             url_fields = [
                 'url', 'avatar', 'image', 'cover', 'url_default', 'url_pre', 
                 'token', 'link', 'href', 'src'
@@ -337,7 +335,7 @@ class XhsMCPWrapperService:
                 if isinstance(obj, dict):
                     cleaned = {}
                     for key, value in obj.items():
-                        # 特殊处理：保留xsec_token字段
+                        # 特殊处理：保留笔记级别的xsec_token字段
                         if key == 'xsec_token':
                             cleaned[key] = value
                             continue
@@ -374,10 +372,10 @@ class XhsMCPWrapperService:
                             'id': item.get('id', ''),
                             'title': note_card.get('display_title', ''),
                             'type': note_card.get('type', ''),
+                            'xsec_token': item.get('xsec_token', ''),  # 使用笔记级别的xsec_token
                             'user': {
                                 'nickname': note_card.get('user', {}).get('nickname', ''),
                                 'user_id': note_card.get('user', {}).get('user_id', ''),
-                                'xsec_token': note_card.get('user', {}).get('xsec_token', '')  # 保留xsec_token供AI使用
                             },
                             'interactions': {
                                 'liked_count': note_card.get('interact_info', {}).get('liked_count', 0),

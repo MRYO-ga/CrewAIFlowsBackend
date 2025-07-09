@@ -24,6 +24,7 @@ from pydantic import BaseModel
 
 from .tool_service import ToolService
 from .mcp_client_service import MCPClientService, LogType
+from utils.persona_prompts import persona_manager
 
 class ChatMessage(BaseModel):
     """聊天消息模型"""
@@ -57,9 +58,8 @@ class LLMService:
         self.logger = logging.getLogger(__name__)
         
         # 基础系统提示词，工具信息将在运行时动态添加
-        self.base_system_prompt = """你是一个专业的AI开发助手和数据分析专家。
-
-作为开发助手，你可以：
+        self.base_system_prompt = """
+作为专家，你可以：
 - 查询和分析数据库中的数据
 - 执行数据库的增删改查操作
 - 提供数据结构和架构信息
@@ -128,14 +128,18 @@ class LLMService:
 - 不要在单次响应中承诺多个工具调用，按需逐个执行
 - 不要使用除了指定JSON格式外的任何工具调用格式"""
         
-    async def process_message_stream(self, user_input: str, conversation_history: Optional[List[Dict[str, Any]]] = None, model: str = None) -> AsyncGenerator[StreamChunk, None]:
+    async def process_message_stream(self, user_input: str, 
+                                   conversation_history: Optional[List[Dict[str, Any]]] = None, 
+                                   model: str = None,
+                                   attached_data: Optional[List[Dict[str, Any]]] = None) -> AsyncGenerator[StreamChunk, None]:
         """
-        流式处理用户消息，支持工具调用
+        流式处理用户消息，支持工具调用和动态agent切换
         
         Args:
             user_input: 用户输入
             conversation_history: 对话历史
             model: 使用的模型（如果为None则使用默认模型）
+            attached_data: 附加数据，包含persona_context等信息
             
         Yields:
             StreamChunk: 流式输出数据块
@@ -145,17 +149,27 @@ class LLMService:
             available_tools = await self.tool_service.get_tools_for_llm()
             tools_text = self._format_tools_for_llm(available_tools)
             
-            system_prompt = f"""你是一个专业的AI开发助手和数据分析专家。
-
-作为开发助手，你可以使用以下工具执行数据库操作：
-
-{tools_text}
-
-{self.base_system_prompt}"""
+            # 检查是否有persona_context，用于动态切换agent
+            agent_prompt = self.base_system_prompt
+            if attached_data:
+                for data_item in attached_data:
+                    if data_item.get("type") == "persona_context" and data_item.get("data"):
+                        persona_data = data_item["data"]
+                        # 使用persona_manager获取对应的agent提示词
+                        agent_prompt = persona_manager.get_persona_by_context(persona_data)
+                        print(f"🤖 检测到agent切换: {persona_data.get('agent', '未知')}")
+                        break
+            
+            system_prompt = f"""
+                            {agent_prompt}
+                            {self.base_system_prompt}
+                            {tools_text}
+                            """
 
             # 构建对话历史
             messages = [{"role": "system", "content": system_prompt}]
-            print(f"🔍 构建的系统提示词: {system_prompt}")
+            print(f"🔍 构建的系统提示词: {system_prompt[:]}...")
+            
             # 添加历史对话
             if conversation_history:
                 for msg in conversation_history[-5:]:  # 只保留最近5轮对话
@@ -652,7 +666,6 @@ class LLMService:
             messages.append({"role": "user", "content": user_input})
             
             print(f"🎭 使用人设聊天，消息数量: {len(messages)}")
-            print(f"🎭 人设提示词: {system_prompt}")
             
             # 调用LLM
             response = await self._call_llm(messages, model)
