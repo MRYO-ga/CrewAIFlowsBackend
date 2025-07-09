@@ -93,148 +93,83 @@ class XhsService:
                         saved_note_ids.append(note_id)
                         continue
                     
-                    # 获取note_card数据
-                    note_card = note_item.get('note_card', {})
-                    if not isinstance(note_card, dict):
-                        print(f"⚠️ [XhsService] note_card字段缺失或格式错误，跳过")
-                        continue
-                    
-                    # print(f"🔍 [XhsService] note_card键: {list(note_card.keys())}")
-                    
-                    # 获取笔记标题
-                    display_title = note_card.get('display_title', '')
-                    title = note_card.get('title', display_title)
-                    desc = note_card.get('desc', '')
-                    # print(f"🗄️ [XhsService] 笔记标题: {display_title}")
-                    # print(f"🗄️ [XhsService] 笔记内容: {desc[:100]}...")
-                    
                     # 创建新笔记记录
                     note = XhsNote(
                         id=note_id,
-                        display_title=display_title[:500] if display_title else '',  # 限制长度
-                        title=title[:500] if title else '',  # 限制长度
-                        desc=desc[:5000] if desc else '',  # 限制描述长度
-                        content=str(note_card.get('content', ''))[:5000],  # 限制内容长度
-                        note_type=str(note_card.get('type', 'normal')),
                         model_type=str(note_item.get('model_type', 'note')),
+                        xsec_token=str(note_item.get('xsec_token', '')),
+                        note_url=str(note_item.get('note_url', '')),
+                        
+                        # 笔记基本信息
+                        type=str(note_item.get('type', 'normal')),
+                        display_title=note_item.get('display_title', '')[:500] if note_item.get('display_title') else '',
+                        desc=note_item.get('desc', '')[:5000] if note_item.get('desc') else '',
+                        ip_location=str(note_item.get('ip_location', '')),
+                        
+                        # 时间信息
+                        time=str(note_item.get('time', '')),
+                        timestamp=note_item.get('timestamp', 0),
+                        last_update_time=str(note_item.get('last_update_time', '')),
+                        
+                        # 数据来源
                         source=source,
                         search_keyword=search_keyword
                     )
                     
-                    # 用户信息 - 从note_card.user中获取
-                    user_info = note_card.get('user', {})
+                    # 用户信息
+                    user_info = note_item.get('user', {})
                     if isinstance(user_info, dict):
                         note.user_id = str(user_info.get('user_id', ''))
-                        note.user_nickname = str(user_info.get('nickname', user_info.get('nick_name', '')))[:200]  # 限制长度
+                        note.user_nickname = str(user_info.get('nickname', ''))[:200]  # 限制长度
                         note.user_avatar = str(user_info.get('avatar', ''))[:500]  # 限制长度
-                        print(f"🗄️ [XhsService] 用户信息: {note.user_nickname} ({note.user_id})")
+                        note.user_xsec_token = str(user_info.get('xsec_token', ''))
                     
-                    # 互动数据 - 从note_card.interact_info中获取
-                    interact_info = note_card.get('interact_info', {})
+                    # 互动数据 - 直接保存为字符串
+                    interact_info = note_item.get('interact_info', {})
                     if isinstance(interact_info, dict):
-                        # 确保数值类型正确转换，处理字符串数字
-                        try:
-                            note.liked_count = int(str(interact_info.get('liked_count', 0)).replace(',', ''))
-                        except (ValueError, TypeError):
-                            note.liked_count = 0
-                        
-                        try:
-                            note.comment_count = int(str(interact_info.get('comment_count', 0)).replace(',', ''))
-                        except (ValueError, TypeError):
-                            note.comment_count = 0
-                        
-                        try:
-                            note.collected_count = int(str(interact_info.get('collected_count', 0)).replace(',', ''))
-                        except (ValueError, TypeError):
-                            note.collected_count = 0
-                        
-                        try:
-                            note.shared_count = int(str(interact_info.get('shared_count', 0)).replace(',', ''))
-                        except (ValueError, TypeError):
-                            note.shared_count = 0
-                        
-                        note.liked = bool(interact_info.get('liked', False))
-                        note.collected = bool(interact_info.get('collected', False))
-                        
-                        # print(f"🗄️ [XhsService] 互动数据: 点赞{note.liked_count} 评论{note.comment_count} 收藏{note.collected_count}")
+                        note.liked_count = str(interact_info.get('liked_count', '0'))
+                        note.comment_count = str(interact_info.get('comment_count', '0'))
+                        note.collected_count = str(interact_info.get('collected_count', '0'))
+                        note.share_count = str(interact_info.get('share_count', '0'))
                     
-                    # 封面图片信息 - 从note_card.cover中获取
-                    cover_info = note_card.get('cover', {})
-                    if isinstance(cover_info, dict):
-                        note.cover_url_default = str(cover_info.get('url_default', ''))[:500]
-                        note.cover_url_pre = str(cover_info.get('url_pre', ''))[:500]
-                        
-                        # 确保数值类型正确转换
-                        try:
-                            note.cover_height = int(cover_info.get('height', 0))
-                        except (ValueError, TypeError):
-                            note.cover_height = 0
-                        
-                        try:
-                            note.cover_width = int(cover_info.get('width', 0))
-                        except (ValueError, TypeError):
-                            note.cover_width = 0
-                        
-                        # print(f"🗄️ [XhsService] 封面信息: {note.cover_width}x{note.cover_height}")
+                    # 封面图片信息
+                    note.cover_image = str(note_item.get('cover_image', ''))[:500]
                     
-                    # 图片列表 - 从note_card.image_list中获取，确保是JSON可序列化的
-                    image_list = note_card.get('image_list', [])
-                    if image_list and isinstance(image_list, (list, dict)):
+                    # 图片列表
+                    images = note_item.get('images', [])
+                    if images and isinstance(images, list):
                         try:
-                            # 测试JSON序列化能力，但不改变数据类型
-                            json_str = json.dumps(image_list, ensure_ascii=False)
+                            # 直接保存URL列表
+                            json_str = json.dumps(images, ensure_ascii=False)
                             if len(json_str) < 10000:  # 限制JSON大小
-                                # SQLAlchemy的JSON字段接受Python对象
-                                note.image_list = image_list
-                                print(f"🗄️ [XhsService] 图片列表: {len(image_list) if isinstance(image_list, list) else 1}张")
+                                note.images = images
                             else:
                                 print("⚠️ [XhsService] 图片列表JSON过大，设为空列表")
-                                note.image_list = []
+                                note.images = []
                         except (TypeError, ValueError, UnicodeDecodeError) as e:
                             print(f"⚠️ [XhsService] 图片列表JSON序列化失败: {e}")
-                            note.image_list = []
-                    else:
-                        note.image_list = []
+                            note.images = []
                     
-                    # 角标信息 - 从note_card.corner_tag_info中获取，确保是JSON可序列化的
-                    corner_tag_info = note_card.get('corner_tag_info', [])
-                    if corner_tag_info and isinstance(corner_tag_info, (list, dict)):
+                    # 评论数据
+                    comments = note_item.get('comments', [])
+                    if comments and isinstance(comments, list):
                         try:
-                            # 测试JSON序列化能力，但不改变数据类型
-                            json_str = json.dumps(corner_tag_info, ensure_ascii=False)
-                            if len(json_str) < 5000:  # 限制JSON大小
-                                # SQLAlchemy的JSON字段接受Python对象
-                                note.corner_tag_info = corner_tag_info
-                                # 尝试从角标信息中提取发布时间
-                                if isinstance(corner_tag_info, list):
-                                    for tag in corner_tag_info:
-                                        if isinstance(tag, dict) and tag.get('type') == 'publish_time':
-                                            publish_time_text = tag.get('text', '')
-                                            print(f"🗄️ [XhsService] 发布时间文本: {publish_time_text}")
-                                            break
+                            json_str = json.dumps(comments, ensure_ascii=False)
+                            if len(json_str) < 10000:  # 限制JSON大小
+                                note.comments_json = comments
+                                print(f"🗄️ [XhsService] 评论数据: {len(comments)}条")
                             else:
-                                print("⚠️ [XhsService] 角标信息JSON过大，设为空列表")
-                                note.corner_tag_info = []
+                                print("⚠️ [XhsService] 评论数据JSON过大，设为空列表")
+                                note.comments_json = []
                         except (TypeError, ValueError, UnicodeDecodeError) as e:
-                            print(f"⚠️ [XhsService] 角标信息JSON序列化失败: {e}")
-                            note.corner_tag_info = []
-                    else:
-                        note.corner_tag_info = []
-                    
-                    # 发布时间 - 尝试从多个字段获取
-                    try:
-                        publish_time = note_item.get('time', note_card.get('time', 0))
-                        if isinstance(publish_time, str):
-                            publish_time = int(publish_time) if publish_time.isdigit() else 0
-                        note.publish_time = int(publish_time)
-                    except (ValueError, TypeError):
-                        note.publish_time = 0
+                            print(f"⚠️ [XhsService] 评论数据JSON序列化失败: {e}")
+                            note.comments_json = []
                     
                     # 添加到数据库
                     db.add(note)
                     db.commit()
                     saved_note_ids.append(note_id)
-                    print(f"✅ [XhsService] 笔记 {note_id} 保存成功")
+                    # print(f"✅ [XhsService] 笔记 {note_id} 保存成功")
                     
                 except Exception as add_error:
                     print(f"❌ [XhsService] 保存笔记 {note_id} 失败: {add_error}")
@@ -411,7 +346,6 @@ class XhsService:
                 note_dict = {
                     'id': note.id,
                     'display_title': note.display_title,
-                    'title': note.title,
                     'desc': note.desc,
                     'content': note.content[:200] + '...' if len(note.content) > 200 else note.content,
                     'user_nickname': note.user_nickname,
@@ -419,11 +353,13 @@ class XhsService:
                     'liked_count': note.liked_count,
                     'comment_count': note.comment_count,
                     'collected_count': note.collected_count,
-                    'shared_count': note.shared_count,
+                    # 兼容share_count和shared_count
+                    'share_count': note.share_count if hasattr(note, 'share_count') else note.shared_count,
                     'cover_url_pre': note.cover_url_pre,
                     'source': note.source,
                     'search_keyword': note.search_keyword,
                     'publish_time': note.publish_time,
+                    'publish_time_text': note.publish_time_text if hasattr(note, 'publish_time_text') else None,
                     'created_at': note.created_at.isoformat() if note.created_at else None,
                 }
                 note_list.append(note_dict)
@@ -465,7 +401,6 @@ class XhsService:
             note_detail = {
                 'id': note.id,
                 'display_title': note.display_title,
-                'title': note.title,
                 'desc': note.desc,
                 'content': note.content,
                 'note_type': note.note_type,
@@ -475,12 +410,14 @@ class XhsService:
                 'liked_count': note.liked_count,
                 'comment_count': note.comment_count,
                 'collected_count': note.collected_count,
-                'shared_count': note.shared_count,
+                # 兼容share_count和shared_count
+                'share_count': note.share_count if hasattr(note, 'share_count') else note.shared_count,
                 'cover_url_default': note.cover_url_default,
                 'cover_url_pre': note.cover_url_pre,
                 'image_list': note.image_list,
                 'corner_tag_info': note.corner_tag_info,
                 'publish_time': note.publish_time,
+                'publish_time_text': note.publish_time_text if hasattr(note, 'publish_time_text') else None,
                 'source': note.source,
                 'search_keyword': note.search_keyword,
                 'created_at': note.created_at.isoformat() if note.created_at else None
@@ -602,85 +539,48 @@ class XhsService:
             saved_count = save_result.get("saved_count", 0)
             saved_note_ids = save_result.get("note_ids", [])
             
-            # 为AI提取关键信息
+            # 为AI提取关键信息 - 简化版本，只保留必要字段
             ai_notes = []
             for item in items:
                 if not isinstance(item, dict):
                     continue
-                    
-                note_card = item.get('note_card', {})
-                if not note_card:
-                    continue
                 
-                # 提取用户信息
-                user_info = note_card.get('user', {})
-                user_data = {
-                    'nickname': user_info.get('nickname', user_info.get('nick_name', '')),
-                    'user_id': user_info.get('user_id', ''),
-                }
-                
-                # 使用笔记级别的xsec_token，而不是用户的xsec_token
-                note_xsec_token = item.get('xsec_token', '')
-                
-                # 提取互动信息
-                interact_info = note_card.get('interact_info', {})
-                interaction_data = {
-                    'liked_count': self._safe_int(interact_info.get('liked_count', 0)),
-                    'comment_count': self._safe_int(interact_info.get('comment_count', 0)),
-                    'collected_count': self._safe_int(interact_info.get('collected_count', 0)),
-                    'shared_count': self._safe_int(interact_info.get('shared_count', 0)),
-                    'liked': interact_info.get('liked', False),
-                    'collected': interact_info.get('collected', False)
-                }
-                
-                # 提取图片信息
-                image_list = note_card.get('image_list', [])
-                image_count = len(image_list) if isinstance(image_list, list) else 0
-                
-                # 提取标签信息
-                tag_list = note_card.get('tag_list', [])
-                tags = [tag.get('name', '') for tag in tag_list if isinstance(tag, dict) and tag.get('name')]
-                
-                # 提取发布时间
-                corner_tag_info = note_card.get('corner_tag_info', [])
-                publish_time = ''
-                for tag in corner_tag_info:
-                    if isinstance(tag, dict) and tag.get('type') == 'publish_time':
-                        publish_time = tag.get('text', '')
-                        break
-                
-                # 构建AI友好的笔记信息
+                # 构建AI友好的笔记信息 - 只包含必要字段
                 note_info = {
                     'id': item.get('id', ''),
-                    'title': note_card.get('title', note_card.get('display_title', '')),
-                    'desc': note_card.get('desc', ''),
-                    'type': note_card.get('type', ''),
-                    'model_type': item.get('model_type', ''),
-                    'xsec_token': note_xsec_token,  # 使用笔记级别的xsec_token
-                    'user': user_data,
-                    'interactions': interaction_data,
-                    'image_count': image_count,
-                    'tags': tags,
-                    'publish_time': publish_time,
-                    'time': item.get('time', 0),
-                    'ip_location': note_card.get('ip_location', ''),
+                    'display_title': item.get('display_title', ''),
+                    'desc': item.get('desc', ''),
+                    'ip_location': item.get('ip_location', ''),
+                    'time': item.get('time', ''),
+                    'xsec_token': item.get('xsec_token', ''),  # 保留xsec_token以便AI可以获取更多信息
                     'saved_to_db': item.get('id', '') in saved_note_ids
                 }
                 
+                # 用户信息 - 只保留nickname
+                if 'user' in item and isinstance(item['user'], dict):
+                    note_info['user'] = {
+                        'nickname': item['user'].get('nickname', '')
+                    }
+                
+                # 互动信息
+                if 'interact_info' in item and isinstance(item['interact_info'], dict):
+                    note_info['interact_info'] = item['interact_info']
+                
+                # 评论信息
+                if 'comments' in item and item['comments']:
+                    note_info['comments'] = item['comments']
+                
                 ai_notes.append(note_info)
             
-            # 构建AI友好的数据结构
+            # 构建AI友好的数据结构 - 简化版本
             ai_data = {
                 'success': True,
                 'total_items': len(items),
                 'saved_count': saved_count,
-                'current_time': response_data.get('current_time', 0),
-                'cursor_score': response_data.get('cursor_score', ''),
                 'has_more': response_data.get('has_more', False),
                 'notes': ai_notes,
                 'data_source': source,
-                'search_keyword': search_keyword,
-                'processing_time': datetime.now().isoformat()
+                'search_keyword': search_keyword
             }
             
             print(f"✅ [XhsService] 笔记数据处理完成")

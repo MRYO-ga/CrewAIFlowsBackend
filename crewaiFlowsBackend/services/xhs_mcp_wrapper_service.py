@@ -84,7 +84,7 @@ class XhsMCPWrapperService:
             # 解析原始结果
             result_content = original_result.content
             print(f"📝 [XHS包装器] 原始结果类型: {type(result_content)}")
-            print(f"📝 [XHS包装器] 原始结果前100字符: {str(result_content)[:100]}...")
+            print(f"📝 [XHS包装器] 原始结果前100字符: {str(result_content)[:5000]}...")
             
             if isinstance(result_content, str):
                 # 如果是字符串，尝试解析为JSON
@@ -116,7 +116,7 @@ class XhsMCPWrapperService:
             print(f"💾 [XHS包装器] API响应数据键: {list(api_response.keys()) if isinstance(api_response, dict) else '非字典类型'}")
             
             saved_data = await self._save_tool_data(tool_name, cleaned_tool_args, api_response)
-            print(f"💾 [XHS包装器] 数据保存结果: {saved_data}")
+            # print(f"💾 [XHS包装器] 数据保存结果: {saved_data}")
             
             # 记录API调用日志
             response_time = time.time() - start_time
@@ -312,7 +312,7 @@ class XhsMCPWrapperService:
     
     def _clean_content_for_ai(self, api_response: Dict[str, Any]) -> str:
         """
-        为AI清理内容，移除URL、token等冗余信息，只保留有用的分析信息
+        为AI清理内容，只保留必要字段：display_title、desc、ip_location、user.nickname、interact_info、comments
         
         Args:
             api_response: 原始API响应
@@ -323,79 +323,54 @@ class XhsMCPWrapperService:
         try:
             import json
             
-            # 需要移除的字段（URL、token等）
-            # 注意：保留笔记级别的xsec_token，因为AI需要它来调用get_note_content和get_note_comments
-            url_fields = [
-                'url', 'avatar', 'image', 'cover', 'url_default', 'url_pre', 
-                'token', 'link', 'href', 'src'
-            ]
-            
-            def clean_dict(obj):
-                """递归清理字典中的URL和token字段"""
-                if isinstance(obj, dict):
-                    cleaned = {}
-                    for key, value in obj.items():
-                        # 特殊处理：保留笔记级别的xsec_token字段
-                        if key == 'xsec_token':
-                            cleaned[key] = value
-                            continue
-                        # 跳过URL相关字段
-                        if any(field in key.lower() for field in url_fields):
-                            continue
-                        # 跳过info_list（包含图片URL）
-                        if key == 'info_list':
-                            continue
-                        # 递归处理嵌套对象
-                        cleaned[key] = clean_dict(value)
-                    return cleaned
-                elif isinstance(obj, list):
-                    return [clean_dict(item) for item in obj]
-                else:
-                    return obj
-            
-            # 清理API响应
-            cleaned_response = clean_dict(api_response)
-            
             # 如果有笔记数据，提取关键信息用于AI分析
-            if 'data' in cleaned_response and 'items' in cleaned_response['data']:
-                items = cleaned_response['data']['items']
+            if 'data' in api_response and 'items' in api_response['data']:
+                items = api_response['data']['items']
                 ai_friendly_data = {
-                    'success': cleaned_response.get('success', True),
+                    'success': api_response.get('success', True),
                     'total_items': len(items),
                     'notes': []
                 }
                 
-                for item in items[:10]:  # 限制给AI的笔记数量
-                    if 'note_card' in item:
-                        note_card = item['note_card']
-                        note_info = {
-                            'id': item.get('id', ''),
-                            'title': note_card.get('display_title', ''),
-                            'type': note_card.get('type', ''),
-                            'xsec_token': item.get('xsec_token', ''),  # 使用笔记级别的xsec_token
-                            'user': {
-                                'nickname': note_card.get('user', {}).get('nickname', ''),
-                                'user_id': note_card.get('user', {}).get('user_id', ''),
-                            },
-                            'interactions': {
-                                'liked_count': note_card.get('interact_info', {}).get('liked_count', 0),
-                                'comment_count': note_card.get('interact_info', {}).get('comment_count', 0),
-                                'collected_count': note_card.get('interact_info', {}).get('collected_count', 0),
-                                'shared_count': note_card.get('interact_info', {}).get('shared_count', 0)
-                            },
-                            'publish_time': next(
-                                (tag.get('text', '') for tag in note_card.get('corner_tag_info', [])
-                                 if isinstance(tag, dict) and tag.get('type') == 'publish_time'), 
-                                ''
-                            ),
-                            'image_count': len(note_card.get('image_list', [])),
+                for item in items:  # 处理所有笔记
+                    # 只保留必要字段
+                    note_info = {
+                        'id': item.get('id', ''),
+                        'display_title': item.get('display_title', ''),
+                        'desc': item.get('desc', ''),
+                        'ip_location': item.get('ip_location', ''),
+                        'time': item.get('time', ''),
+                        'xsec_token': item.get('xsec_token', '')  # 保留xsec_token以便AI可以获取更多信息
+                    }
+                    
+                    # 用户信息 - 只保留nickname
+                    if 'user' in item and isinstance(item['user'], dict):
+                        note_info['user'] = {
+                            'nickname': item['user'].get('nickname', '')
                         }
-                        ai_friendly_data['notes'].append(note_info)
+                    
+                    # 互动信息
+                    if 'interact_info' in item and isinstance(item['interact_info'], dict):
+                        note_info['interact_info'] = item['interact_info']
+                    
+                    # 评论信息
+                    if 'comments' in item and item['comments']:
+                        note_info['comments'] = item['comments']
+                    
+                    ai_friendly_data['notes'].append(note_info)
+                
+                # 添加分页信息
+                if 'has_more' in api_response['data']:
+                    ai_friendly_data['has_more'] = api_response['data']['has_more']
                 
                 return json.dumps(ai_friendly_data, ensure_ascii=False, indent=2)
             else:
-                # 对于其他类型的响应，返回清理后的数据
-                return json.dumps(cleaned_response, ensure_ascii=False, indent=2)
+                # 对于其他类型的响应，返回基本信息
+                return json.dumps({
+                    'success': api_response.get('success', False),
+                    'message': '数据已保存到数据库，请通过数据管理页面查看详细信息',
+                    'code': api_response.get('code', 0)
+                }, ensure_ascii=False)
                 
         except Exception as e:
             print(f"⚠️ [XHS包装器] 清理AI内容失败: {e}")

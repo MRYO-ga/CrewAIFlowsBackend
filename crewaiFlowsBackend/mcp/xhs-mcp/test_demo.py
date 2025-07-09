@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # 小红书cookie（从main.py中复制）
-XHS_COOKIE = "gid=yYdKy2f2q2uSyYdKy2fKjT1d2iIkdiKl9T9kx2U1JhiE742817DJUE888J4WWqY8jqfYjqf2; x-user-id-ark.xiaohongshu.com=5cfb51d100000000170277d9; customerClientId=237676388163235; x-user-id-school.xiaohongshu.com=5cfb51d100000000170277d9; x-user-id-idea.xiaohongshu.com=5cfb51d100000000170277d9; x-user-id-xue.xiaohongshu.com=5cfb51d100000000170277d9; access-token-xue.xiaohongshu.com=customer.xue.AT-68c517461650282850257612x3shfq41tt5ccaks; abRequestId=8b2fd6af-69dd-57d8-9731-4637e41e84b0; a1=195b92bbbfcn65sdsm8kxonnlj7rn4wu0qmv04kk950000939546; webId=b01a306eb477ce6e210befde742ec7f8; webBuild=4.68.0; web_session=0400698d8f12990c278f536e6f3a4be7646e16; unread={%22ub%22:%2268524b7c0000000023014a76%22%2C%22ue%22:%22684fe177000000002301dfd3%22%2C%22uc%22:33}; customer-sso-sid=68c517519375867374375952gftpetbrk8taraic; x-user-id-creator.xiaohongshu.com=5cfb51d100000000170277d9; access-token-creator.xiaohongshu.com=customer.creator.AT-68c5175193758673743759541pslv2v9xhjz8vmu; galaxy_creator_session_id=sWklb9wEQ2b90Fd6sGYSei2Q0Y4skupvLjUD; galaxy.creator.beaker.session.id=1750741123609076061264; websectiga=634d3ad75ffb42a2ade2c5e1705a73c845837578aeb31ba0e442d75c648da36a; sec_poison_id=b6f21a36-9859-45c1-9664-0b06523e54fc; acw_tc=0a4aa3fc17507520796305767e2f473f10b19453abc5d41056f36229044f64; xsecappid=xhs-pc-web; loadts=1750752098677"
+XHS_COOKIE = "gid=yYdKy2f2q2uSyYdKy2fKjT1d2iIkdiKl9T9kx2U1JhiE742817DJUE888J4WWqY8jqfYjqf2; x-user-id-ark.xiaohongshu.com=5cfb51d100000000170277d9; customerClientId=237676388163235; x-user-id-school.xiaohongshu.com=5cfb51d100000000170277d9; x-user-id-idea.xiaohongshu.com=5cfb51d100000000170277d9; x-user-id-xue.xiaohongshu.com=5cfb51d100000000170277d9; abRequestId=8b2fd6af-69dd-57d8-9731-4637e41e84b0; a1=195b92bbbfcn65sdsm8kxonnlj7rn4wu0qmv04kk950000939546; webId=b01a306eb477ce6e210befde742ec7f8; x-user-id-creator.xiaohongshu.com=5cfb51d100000000170277d9; access-token-creator.xiaohongshu.com=customer.creator.AT-68c5175193758673743759541pslv2v9xhjz8vmu; galaxy_creator_session_id=sWklb9wEQ2b90Fd6sGYSei2Q0Y4skupvLjUD; galaxy.creator.beaker.session.id=1750741123609076061264; access-token-xue.xiaohongshu.com=customer.xue.AT-68c517521217862883296034jroblrpdf6cppeyf; sensorsdata2015jssdkcross=%7B%22%24device_id%22%3A%22197b9dffeb1a38-0e2c26f54cf636-26011e51-2359296-197b9dffeb22869%22%7D; xsecappid=xhs-pc-web; webBuild=4.72.0; acw_tc=0ad581fa17520539198778256e89383cc0988dda5f130a69b85180d00561c9; web_session=040069b634e26324ab49ea735b3a4bf67225ad; unread={%22ub%22:%22686507c40000000020019a4c%22%2C%22ue%22:%22686bb0b500000000120309be%22%2C%22uc%22:23}; websectiga=6169c1e84f393779a5f7de7303038f3b47a78e47be716e7bec57ccce17d45f99; sec_poison_id=c3aff0ac-410c-47a5-8bc1-a56f5bc23385; loadts=1752054856737"
 
 
 class XhsApiTester:
@@ -37,65 +37,92 @@ class XhsApiTester:
         """测试首页推荐接口"""
         logger.info("=== 测试首页推荐接口 ===")
         try:
-            data = await self.api.home_feed()
+            # 测试带评论的请求
+            logger.info("获取首页推荐（包含评论）...")
+            data = await self.api.home_feed(fetch_content=True, fetch_comments=True)
             self.save_json_to_file(data, "home_feed_response.json")
             
-            # 分析数据结构
+            # 验证数据结构
             if 'data' in data and 'items' in data['data']:
                 items = data['data']['items']
                 logger.info(f"获取到 {len(items)} 条笔记")
                 
-                # 分析第一条笔记的数据结构
+                # 统计包含评论的笔记数
+                comments_count = sum(1 for item in items if 'comments' in item and item['comments'])
+                logger.info(f"包含评论的笔记数: {comments_count}/{len(items)}")
+                
+                # 分析第一条笔记
                 if items:
                     first_note = items[0]
-                    logger.info("第一条笔记的数据结构:")
-                    logger.info(f"- ID: {first_note.get('id')}")
-                    logger.info(f"- model_type: {first_note.get('model_type')}")
-                    logger.info(f"- xsec_token: {first_note.get('xsec_token')}")
+                    logger.info(f"\n笔记数据示例 (ID: {first_note.get('id', 'unknown')}):")
+                    logger.info(f"- 标题: {first_note.get('display_title', '无标题')}")
+                    logger.info(f"- 笔记URL: {first_note.get('note_url', '无URL')}")
                     
-                    if 'note_card' in first_note:
-                        note_card = first_note['note_card']
-                        logger.info(f"- 标题: {note_card.get('display_title')}")
-                        logger.info(f"- 类型: {note_card.get('type')}")
-                        
-                        if 'user' in note_card:
-                            user = note_card['user']
-                            logger.info(f"- 用户昵称: {user.get('nickname')}")
-                            logger.info(f"- 用户ID: {user.get('user_id')}")
+                    # 检查图片格式
+                    if 'images' in first_note:
+                        logger.info(f"- 图片数量: {len(first_note['images'])}")
+                        if first_note['images']:
+                            logger.info(f"- 图片列表示例: {first_note['images'][:2]}")
                             
-                        if 'interact_info' in note_card:
-                            interact = note_card['interact_info']
-                            logger.info(f"- 点赞数: {interact.get('liked_count')}")
-                            logger.info(f"- 评论数: {interact.get('comment_count')}")
-                            logger.info(f"- 收藏数: {interact.get('collected_count')}")
-                            logger.info(f"- 分享数: {interact.get('shared_count')}")
-                            
+                    # 检查评论
+                    if 'comments' in first_note and first_note['comments']:
+                        logger.info(f"- 评论数量: {len(first_note['comments'])}")
+                        if first_note['comments']:
+                            first_comment = first_note['comments'][0]
+                            logger.info(f"- 第一条评论内容: {first_comment.get('content', '无内容')}")
+                            logger.info(f"- 点赞数: {first_comment.get('like_count', 0)}")
+                            logger.info(f"- 是否有子评论: {first_comment.get('sub_comment_has_more', False)}")
+            
             return data
         except Exception as e:
-            logger.error(f"首页推荐接口测试失败: {e}")
+            logger.error(f"首页推荐接口测试失败: {e}", exc_info=True)
             return None
             
     async def test_search_notes(self, keywords="美食"):
         """测试搜索笔记接口"""
         logger.info(f"=== 测试搜索笔记接口: {keywords} ===")
         try:
-            data = await self.api.search_notes(keywords)
+            # 测试带评论的请求
+            logger.info(f"搜索笔记: {keywords}")
+            data = await self.api.search_notes(keywords, fetch_content=True, fetch_comments=True)
             self.save_json_to_file(data, f"search_notes_{keywords}_response.json")
             
-            # 分析数据结构
+            # 验证数据结构
             if 'data' in data and 'items' in data['data']:
                 items = data['data']['items']
                 logger.info(f"搜索到 {len(items)} 条笔记")
                 
-                # 分析搜索结果
-                for i, item in enumerate(items[:3]):  # 只分析前3条
-                    if 'note_card' in item:
-                        note_card = item['note_card']
-                        logger.info(f"第{i+1}条: {note_card.get('display_title')}")
-                        
+                # 统计
+                comments_count = sum(1 for item in items if 'comments' in item and item['comments'])
+                comments_total = sum(len(item.get('comments', [])) for item in items)
+                
+                logger.info(f"\n数据统计:")
+                logger.info(f"- 包含评论的笔记数: {comments_count}/{len(items)}")
+                logger.info(f"- 总评论数: {comments_total}")
+                
+                # 分析第一条笔记
+                if items:
+                    first_note = items[0]
+                    logger.info(f"\n笔记数据示例 (ID: {first_note.get('id', 'unknown')}):")
+                    logger.info(f"- 标题: {first_note.get('display_title', '无标题')}")
+                    logger.info(f"- 发布时间: {first_note.get('time', '无时间')}")
+                    
+                    # 检查图片格式
+                    if 'images' in first_note:
+                        logger.info(f"- 图片数量: {len(first_note['images'])}")
+                        if first_note['images']:
+                            logger.info(f"- 图片列表示例: {first_note['images'][:2]}")
+                    
+                    # 检查评论
+                    if 'comments' in first_note and first_note['comments']:
+                        logger.info(f"- 评论数量: {len(first_note['comments'])}")
+                        if first_note['comments']:
+                            first_comment = first_note['comments'][0]
+                            logger.info(f"- 第一条评论内容: {first_comment.get('content', '无内容')}")
+            
             return data
         except Exception as e:
-            logger.error(f"搜索笔记接口测试失败: {e}")
+            logger.error(f"搜索笔记接口测试失败: {e}", exc_info=True)
             return None
             
     async def test_get_note_content(self, note_id=None, xsec_token=None):
@@ -181,15 +208,12 @@ class XhsApiTester:
         # 1. 测试首页推荐
         await self.test_home_feed()
         
-        # 2. 测试搜索功能
+        # 添加延时，避免请求过于频繁
+        logger.info("等待10秒后继续测试...")
+        await asyncio.sleep(10)
+        
+        # 2. 测试搜索功能 - 只测试一个关键词
         await self.test_search_notes("美食")
-        await self.test_search_notes("旅游")
-        
-        # 3. 测试获取笔记内容
-        await self.test_get_note_content()
-        
-        # 4. 测试获取笔记评论
-        await self.test_get_note_comments()
         
         logger.info("所有测试完成!")
 

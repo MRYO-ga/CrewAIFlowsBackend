@@ -317,56 +317,51 @@ Competitor.notes = relationship("CompetitorNote", back_populates="competitor")
 # 小红书数据模型
 
 class XhsNote(Base):
-    """小红书笔记模型"""
+    """小红书笔记表"""
     __tablename__ = "xhs_notes"
-
-    id = Column(String(100), primary_key=True, comment="笔记ID")
-    display_title = Column(String(500), comment="显示标题")
-    title = Column(String(500), comment="笔记标题")
-    desc = Column(Text, comment="笔记内容")
-    content = Column(Text, comment="笔记内容")
-    note_type = Column(String(50), default="normal", comment="笔记类型")
-    model_type = Column(String(50), default="note", comment="模型类型")
+    
+    id = Column(String(50), primary_key=True)  # 笔记ID
+    model_type = Column(String(50), nullable=True)  # 模型类型
+    xsec_token = Column(String(500), nullable=True)  # 安全令牌
+    note_url = Column(String(500), nullable=True)  # 笔记URL
+    
+    # 笔记基本信息
+    type = Column(String(50), nullable=True)  # 笔记类型（video, normal等）
+    display_title = Column(String(500), nullable=True)  # 显示标题
+    desc = Column(Text, nullable=True)  # 描述
+    ip_location = Column(String(100), nullable=True)  # IP位置
+    
+    # 时间信息
+    time = Column(String(50), nullable=True)  # 发布时间（格式化）
+    timestamp = Column(BigInteger, nullable=True)  # 时间戳
+    last_update_time = Column(String(50), nullable=True)  # 最后更新时间
     
     # 用户信息
-    user_id = Column(String(100), comment="用户ID")
-    user_nickname = Column(String(200), comment="用户昵称")
-    user_avatar = Column(String(500), comment="用户头像")
+    user_id = Column(String(50), nullable=True)  # 用户ID
+    user_nickname = Column(String(200), nullable=True)  # 用户昵称
+    user_avatar = Column(String(500), nullable=True)  # 用户头像
+    user_xsec_token = Column(String(500), nullable=True)  # 用户安全令牌
     
-    # 互动数据
-    liked_count = Column(Integer, default=0, comment="点赞数")
-    comment_count = Column(Integer, default=0, comment="评论数")
-    collected_count = Column(Integer, default=0, comment="收藏数")
-    shared_count = Column(Integer, default=0, comment="分享数")
-    liked = Column(Boolean, default=False, comment="当前用户是否点赞")
-    collected = Column(Boolean, default=False, comment="当前用户是否收藏")
+    # 互动数据 - 使用字符串类型保存，以便保留原始格式（如"1.9万"）
+    liked_count = Column(String(50), default="0")  # 点赞数
+    comment_count = Column(String(50), default="0")  # 评论数
+    collected_count = Column(String(50), default="0")  # 收藏数
+    share_count = Column(String(50), default="0")  # 分享数
     
-    # 封面图片信息
-    cover_url_default = Column(String(500), comment="封面图片默认链接")
-    cover_url_pre = Column(String(500), comment="封面图片预览链接")
-    cover_height = Column(Integer, comment="封面图片高度")
-    cover_width = Column(Integer, comment="封面图片宽度")
+    # 图片信息
+    cover_image = Column(String(500), nullable=True)  # 封面图片URL
+    images = Column(JSON, nullable=True)  # 图片URL列表
     
-    # 图片列表
-    image_list = Column(JSON, comment="笔记图片列表")
-    
-    # 角标信息
-    corner_tag_info = Column(JSON, comment="角标信息")
-    
-    # 发布时间
-    publish_time = Column(BigInteger, comment="发布时间戳")
+    # 评论数据
+    comments_json = Column(JSON, nullable=True)  # 评论数据JSON
     
     # 数据来源
-    source = Column(String(50), default="api", comment="数据来源：api, search, home_feed")
-    search_keyword = Column(String(200), comment="搜索关键词（如果来源是搜索）")
+    source = Column(String(50), nullable=True)  # 数据来源（home_feed, search等）
+    search_keyword = Column(String(200), nullable=True)  # 搜索关键词
     
-    # 创建和更新时间
-    created_at = Column(DateTime, default=func.now(), comment="数据创建时间")
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="数据更新时间")
-    
-    # 时间戳字段
-    created_at = Column(DateTime, default=func.now(), comment="数据创建时间")
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="数据更新时间")
+    # 时间戳
+    created_at = Column(DateTime, default=datetime.now)  # 创建时间
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # 更新时间
 
 
 class XhsSearchRecord(Base):
