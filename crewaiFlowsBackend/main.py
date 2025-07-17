@@ -28,7 +28,7 @@ from pathlib import Path
 from database.database import create_tables
 # 导入所有模型以确保表被创建
 from database.models import (
-    PersonaDocument, Content, Competitor, Task, Schedule, 
+    PersonaDocument, ProductDocument, Content, Competitor, Task, Schedule, 
     ChatMessage, CompetitorNote,
     SOP, SOPCycle, SOPWeek, SOPTask, SOPTaskItem,
     XhsNote, XhsSearchRecord, XhsApiLog
@@ -43,6 +43,7 @@ from api import (
     tasks_router,
     sops_router
 )
+from api.products import router as products_router
 from api.mcp_router import router as mcp_router
 from api.xhs import router as xhs_router
 from api.persona import persona_router
@@ -95,6 +96,7 @@ app.add_middleware(
 # 注册API路由
 app.include_router(persona_router)
 app.include_router(accounts_router)
+app.include_router(products_router)
 app.include_router(contents_router) 
 app.include_router(competitors_router)
 app.include_router(schedules_router)

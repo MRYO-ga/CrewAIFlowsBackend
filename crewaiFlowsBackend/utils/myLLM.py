@@ -62,11 +62,11 @@ MODEL_CONFIGS = {
     },
     
     # DeepSeek模型
-    'deepseek-r1-2025-01-20': {
+    'deepseek-r1-250528': {
         'provider': 'openai',
         'api_base': OPENAI_API_BASE,
         'api_key': OPENAI_CHAT_API_KEY,
-        'model': 'deepseek-r1-2025-01-20'
+        'model': 'deepseek-r1-250528'
     }
 }
 

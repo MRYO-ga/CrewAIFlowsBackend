@@ -40,6 +40,42 @@ class PersonaDocument(Base):
         Index('idx_persona_account_name', 'account_name'),
     )
 
+# 产品品牌信息深度穿透文档模型
+class ProductDocument(Base):
+    __tablename__ = "product_documents"
+
+    id = Column(String(50), primary_key=True)
+    product_name = Column(String(100), nullable=False, comment="产品名称")
+    document_content = Column(Text, nullable=False, comment="产品信息穿透完整文档内容")
+    
+    # 基本信息
+    brand_name = Column(String(100), comment="品牌名称")
+    product_category = Column(String(50), comment="产品类别")
+    price_range = Column(String(50), comment="价格区间")
+    target_audience = Column(String(100), comment="目标用户群体")
+    
+    # 状态信息
+    status = Column(String(20), default="completed", comment="状态: completed, archived")
+    
+    # 时间信息
+    created_at = Column(DateTime, default=func.now(), comment="创建时间")
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), comment="更新时间")
+    completed_at = Column(DateTime, default=func.now(), comment="完成时间")
+    
+    # 用户信息
+    user_id = Column(String(50), default="default_user", comment="用户ID")
+    
+    # 扩展信息
+    tags = Column(JSON, comment="标签列表")
+    summary = Column(Text, comment="简短摘要")
+
+    # 索引
+    __table_args__ = (
+        Index('idx_product_user_created', 'user_id', 'created_at'),
+        Index('idx_product_name', 'product_name'),
+        Index('idx_brand_name', 'brand_name'),
+    )
+
 # 内容管理模型
 class Content(Base):
     __tablename__ = "contents"

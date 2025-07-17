@@ -150,8 +150,9 @@ class XhsApi:
             # 获取评论数据
             if fetch_comments and result["id"] and result["xsec_token"]:
                 try:
+                    
                     # 添加延时避免请求过于频繁
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(2)
                     comments_data = await self.get_note_comments(result["id"], result["xsec_token"])
                     
                     # 简化评论数据
@@ -297,6 +298,8 @@ class XhsApi:
             "geo":"",
             "image_formats":json.dumps(["jpg","webp","avif"], separators=(",", ":"))
         }
+        fetch_comments = False
+        fetch_content = False
         result = await self.request("/api/sns/web/v1/search/notes",method="POST",data=data)
         
         # 如果需要获取笔记内容并且请求成功
@@ -362,7 +365,7 @@ class XhsApi:
                     xsec_token = item['xsec_token']
                     try:
                         # 添加延时，避免请求过于频繁
-                        await asyncio.sleep(1)
+                        await asyncio.sleep(2)
                         
                         # 获取笔记详细内容（最多尝试2次）
                         retries = 1

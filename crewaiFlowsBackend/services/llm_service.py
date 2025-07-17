@@ -151,14 +151,71 @@ class LLMService:
             
             # 检查是否有persona_context，用于动态切换agent
             agent_prompt = self.base_system_prompt
+            enhanced_user_input = user_input
+            
             if attached_data:
+                # 处理agent切换 - 优先查找包含agent字段的persona_context
                 for data_item in attached_data:
-                    if data_item.get("type") == "persona_context" and data_item.get("data"):
+                    if (data_item.get("type") == "persona_context" and 
+                        data_item.get("data") and 
+                        data_item.get("data", {}).get("agent")):
                         persona_data = data_item["data"]
                         # 使用persona_manager获取对应的agent提示词
                         agent_prompt = persona_manager.get_persona_by_context(persona_data)
                         print(f"🤖 检测到agent切换: {persona_data.get('agent', '未知')}")
                         break
+                
+                # 处理附加的数据内容，将其添加到用户输入中
+                context_data_list = []
+                for data_item in attached_data:
+                    data_type = data_item.get("type", "")
+                    data_content = data_item.get("data", {})
+                    data_name = data_item.get("name", "")
+                    
+                    # 跳过用于agent选择的persona_context数据
+                    if (data_type == "persona_context" and 
+                        data_content.get("agent") is not None):
+                        continue
+                    
+                    # 处理persona_context数据
+                    if data_type == "persona_context" and data_content:
+                        context_data_list.append({
+                            "type": "账号人设信息",
+                            "name": data_name,
+                            "content": data_content
+                        })
+                        print(f"📋 处理引用数据: 类型=persona_context, 名称={data_name}")
+                    
+                    # 处理product_context数据  
+                    elif data_type == "product_context" and data_content:
+                        context_data_list.append({
+                            "type": "产品信息",
+                            "name": data_name,
+                            "content": data_content
+                        })
+                        print(f"📋 处理引用数据: 类型=product_context, 名称={data_name}")
+                    
+                    # 处理其他类型的数据
+                    elif data_type in ["xiaohongshu_note", "xiaohongshu_search"] and data_content:
+                        context_data_list.append({
+                            "type": "小红书数据",
+                            "name": data_name,
+                            "content": data_content
+                        })
+                        print(f"📋 处理引用数据: 类型={data_type}, 名称={data_name}")
+                
+                # 如果有数据内容，添加到用户输入中
+                if context_data_list:
+                    context_text = "\n\n📎 以下是我提供的相关数据：\n"
+                    for i, context_item in enumerate(context_data_list, 1):
+                        context_text += f"\n{i}. 【{context_item['type']}】{context_item['name']}\n"
+                        context_text += f"   数据内容：{str(context_item['content'])}\n"
+                    
+                    enhanced_user_input = user_input + context_text
+                    print(f"✅ 增强输入长度: {len(enhanced_user_input)}")
+                    print(f"📎 发现附加数据: {len(context_data_list)} 项")
+                    for i, item in enumerate(context_data_list, 1):
+                        print(f"   {i}. 【{item['type']}】{item['name']}")
             
             system_prompt = f"""
                             {agent_prompt}
@@ -179,8 +236,8 @@ class LLMService:
                             "content": msg["content"]
                         })
             
-            # 添加当前用户输入
-            messages.append({"role": "user", "content": user_input})
+            # 添加当前用户输入（使用增强后的输入）
+            messages.append({"role": "user", "content": enhanced_user_input})
             
             # 发送开始处理消息
             yield StreamChunk(

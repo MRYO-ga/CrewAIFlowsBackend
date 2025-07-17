@@ -471,9 +471,9 @@ async def get_available_models():
             },
             
             # DeepSeek模型
-            'deepseek-r1-2025-01-20': {
+            'deepseek-r1-250528': {
                 'provider': 'deepseek',
-                'model': 'deepseek-r1-2025-01-20'
+                'model': 'deepseek-r1-250528'
             }
         }
         

@@ -24,8 +24,7 @@ args = parser.parse_args()
 mcp = FastMCP("小红书", port=args.port)
 
 # 直接硬编码cookie
-xhs_cookie = "gid=yYdKy2f2q2uSyYdKy2fKjT1d2iIkdiKl9T9kx2U1JhiE742817DJUE888J4WWqY8jqfYjqf2; x-user-id-ark.xiaohongshu.com=5cfb51d100000000170277d9; customerClientId=237676388163235; x-user-id-school.xiaohongshu.com=5cfb51d100000000170277d9; x-user-id-idea.xiaohongshu.com=5cfb51d100000000170277d9; x-user-id-xue.xiaohongshu.com=5cfb51d100000000170277d9; abRequestId=8b2fd6af-69dd-57d8-9731-4637e41e84b0; a1=195b92bbbfcn65sdsm8kxonnlj7rn4wu0qmv04kk950000939546; webId=b01a306eb477ce6e210befde742ec7f8; x-user-id-creator.xiaohongshu.com=5cfb51d100000000170277d9; access-token-creator.xiaohongshu.com=customer.creator.AT-68c5175193758673743759541pslv2v9xhjz8vmu; galaxy_creator_session_id=sWklb9wEQ2b90Fd6sGYSei2Q0Y4skupvLjUD; galaxy.creator.beaker.session.id=1750741123609076061264; access-token-xue.xiaohongshu.com=customer.xue.AT-68c517521217862883296034jroblrpdf6cppeyf; sensorsdata2015jssdkcross=%7B%22%24device_id%22%3A%22197b9dffeb1a38-0e2c26f54cf636-26011e51-2359296-197b9dffeb22869%22%7D; webBuild=4.72.0; acw_tc=0ad5251117520737991148625eb396f955f504b9880e0502ef5fc37ad34c6c; websectiga=82e85efc5500b609ac1166aaf086ff8aa4261153a448ef0be5b17417e4512f28; sec_poison_id=0b94c750-06ff-4631-913a-77334b18a04f; xsecappid=xhs-pc-web; web_session=040069b344758b12045374c55b3a4b326c0777; unread={%22ub%22:%2268667957000000002001aacf%22%2C%22ue%22:%2268675e5c0000000012015310%22%2C%22uc%22:33}; loadts=1752075556375"
-
+xhs_cookie = "gid=yYdKy2f2q2uSyYdKy2fKjT1d2iIkdiKl9T9kx2U1JhiE742817DJUE888J4WWqY8jqfYjqf2; x-user-id-ark.xiaohongshu.com=5cfb51d100000000170277d9; customerClientId=237676388163235; x-user-id-school.xiaohongshu.com=5cfb51d100000000170277d9; x-user-id-idea.xiaohongshu.com=5cfb51d100000000170277d9; x-user-id-xue.xiaohongshu.com=5cfb51d100000000170277d9; abRequestId=8b2fd6af-69dd-57d8-9731-4637e41e84b0; a1=195b92bbbfcn65sdsm8kxonnlj7rn4wu0qmv04kk950000939546; webId=b01a306eb477ce6e210befde742ec7f8; x-user-id-creator.xiaohongshu.com=5cfb51d100000000170277d9; access-token-creator.xiaohongshu.com=customer.creator.AT-68c5175193758673743759541pslv2v9xhjz8vmu; galaxy_creator_session_id=sWklb9wEQ2b90Fd6sGYSei2Q0Y4skupvLjUD; galaxy.creator.beaker.session.id=1750741123609076061264; access-token-xue.xiaohongshu.com=customer.xue.AT-68c517521217862883296034jroblrpdf6cppeyf; sensorsdata2015jssdkcross=%7B%22%24device_id%22%3A%22197b9dffeb1a38-0e2c26f54cf636-26011e51-2359296-197b9dffeb22869%22%7D; webBuild=4.72.0; xsecappid=xhs-pc-web; web_session=040069b634e26324ab499f62423a4bafc5efdd; unread={%22ub%22:%226876375d000000001d00e072%22%2C%22ue%22:%2268776b8500000000220338a1%22%2C%22uc%22:25}; acw_tc=0ad58c4f17527417609198854e51ed8c8a3afa84790b1f2235a13c55866111; websectiga=634d3ad75ffb42a2ade2c5e1705a73c845837578aeb31ba0e442d75c648da36a; sec_poison_id=589ac0e2-b96f-4e33-899d-29e19a62a21b; loadts=1752742176748"
 xhs_api = XhsApi(cookie=xhs_cookie)
 
 
@@ -91,7 +90,7 @@ async def search_notes(keywords: str, fetch_content: bool = True, fetch_comments
     """
     try:
         data = await xhs_api.search_notes(keywords, fetch_content=fetch_content, fetch_comments=fetch_comments)
-        logger.info(f'search_notes keywords: {keywords}, response: {data}')
+        # logger.info(f'search_notes keywords: {keywords}, response: {data}')
         
         # 直接返回JSON格式的原始数据
         return json.dumps(data, ensure_ascii=False, indent=2)

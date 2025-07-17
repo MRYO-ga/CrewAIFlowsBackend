@@ -84,7 +84,7 @@ class XhsMCPWrapperService:
             # 解析原始结果
             result_content = original_result.content
             print(f"📝 [XHS包装器] 原始结果类型: {type(result_content)}")
-            print(f"📝 [XHS包装器] 原始结果前100字符: {str(result_content)[:5000]}...")
+            print(f"📝 [XHS包装器] 原始结果前100字符: {str(result_content)[:1000]}...")
             
             if isinstance(result_content, str):
                 # 如果是字符串，尝试解析为JSON
@@ -143,7 +143,7 @@ class XhsMCPWrapperService:
             # 打印给AI的清理后数据
             print(f"🤖 [XHS包装器] 给AI的清理后数据:")
             print("=" * 80)
-            print(clean_content)
+            print(clean_content[:1000])
             print("=" * 80)
             
             # 在原始结果中添加保存信息
